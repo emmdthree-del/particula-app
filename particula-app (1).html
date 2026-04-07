@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Partícula — Tu Identidad Sonora</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=Space+Mono:wght@400;700&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--acento:#c8a96e;--negro:#0d0d0d;--verde:#1a3a2a;--card:rgba(255,255,255,0.04);--border:rgba(255,255,255,0.08)}
+  body{font-family:'DM Sans',sans-serif;background:var(--negro);color:white;min-height:100vh}
+  .screen{display:none;min-height:100vh}.screen.active{display:block}
+  .header{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(13,13,13,0.95);backdrop-filter:blur(10px);z-index:100}
+  .logo{font-family:'DM Serif Display',serif;font-size:1.5rem;color:white;letter-spacing:-0.5px}
+  .logo-badge{font-family:'Space Mono',monospace;font-size:0.55rem;color:rgba(255,255,255,0.25);letter-spacing:0.15em;text-transform:uppercase;border:1px solid rgba(255,255,255,0.1);padding:2px 7px;border-radius:4px;margin-left:8px}
+  .main{max-width:680px;margin:0 auto;padding:2rem 1.5rem 5rem}
+  .tag{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--acento);margin-bottom:0.4rem;display:block}
+  .titulo{font-family:'DM Serif Display',serif;font-size:1.7rem;color:white;font-weight:400;line-height:1.2;margin-bottom:0.4rem}
+  .subtitulo{font-size:0.85rem;color:rgba(255,255,255,0.4);line-height:1.6;margin-bottom:1.75rem}
+  .steps-bar{display:flex;gap:5px;margin-bottom:2rem}
+  .dot{height:2px;flex:1;background:rgba(255,255,255,0.08);border-radius:999px;transition:background 0.3s}
+  .dot.activo{background:var(--acento)}.dot.completo{background:rgba(200,169,110,0.35)}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;margin-bottom:1rem}
+  .field{margin-bottom:1.1rem}.field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.5);margin-bottom:0.35rem}
+  .field label span{color:rgba(255,255,255,0.2);font-weight:300;font-size:0.72rem;margin-left:4px}
+  .field input,.field textarea,.field select{width:100%;padding:0.65rem 0.85rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.88rem;color:white;outline:none;resize:vertical;transition:border-color 0.2s;-webkit-appearance:none}
+  .field input::placeholder,.field textarea::placeholder{color:rgba(255,255,255,0.18)}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:rgba(200,169,110,0.4);background:rgba(255,255,255,0.07)}
+  .field select option{background:#1a1a1a;color:white}.field textarea{min-height:85px}
+  .age-wrap{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .age-wrap select{flex:1;min-width:100px}
+  .age-sep{font-size:0.82rem;color:rgba(255,255,255,0.3);white-space:nowrap}
+  .age-hints{display:flex;flex-wrap:wrap;gap:6px;margin-top:0.5rem}
+  .age-hint{padding:4px 10px;border:1px solid rgba(255,255,255,0.08);border-radius:999px;font-size:0.7rem;color:rgba(255,255,255,0.3);cursor:pointer;transition:all 0.15s}
+  .age-hint:hover{border-color:rgba(200,169,110,0.3);color:rgba(200,169,110,0.7)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:0.4rem}
+  .chip{padding:6px 13px;border:1px solid rgba(255,255,255,0.09);border-radius:999px;font-size:0.75rem;cursor:pointer;color:rgba(255,255,255,0.4);transition:all 0.15s;user-select:none}
+  .chip:hover{border-color:rgba(200,169,110,0.35);color:rgba(255,255,255,0.65)}
+  .chip.active{background:var(--acento);border-color:var(--acento);color:#0d0d0d;font-weight:500}
+  .nav-btns{display:flex;gap:0.75rem;margin-top:1.5rem}
+  .btn-back{padding:0.8rem 1.2rem;background:transparent;border:1px solid rgba(255,255,255,0.09);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:0.85rem;color:rgba(255,255,255,0.35);cursor:pointer;transition:all 0.15s}
+  .btn-back:hover{border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.6)}
+  .btn-primary{flex:1;padding:0.85rem;background:var(--acento);color:#0d0d0d;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:0.92rem;font-weight:500;cursor:pointer;transition:all 0.2s}
+  .btn-primary:hover{background:#d4b87a}.btn-primary:disabled{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.25);cursor:not-allowed}
+  .btn-secondary{padding:0.8rem 1.2rem;background:transparent;border:1px solid rgba(255,255,255,0.09);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:0.85rem;color:rgba(255,255,255,0.5);cursor:pointer;transition:all 0.15s}
+  .btn-secondary:hover{border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.75)}
+  .btn-spotify{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:1rem 1.75rem;background:#1DB954;color:white;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:1rem;font-weight:500;cursor:pointer;transition:all 0.2s}
+  .btn-spotify:hover{background:#1ed760;transform:translateY(-1px)}
+  .btn-logout{background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:0.75rem;color:rgba(255,255,255,0.35);cursor:pointer;transition:all 0.15s}
+  .btn-logout:hover{border-color:rgba(255,255,255,0.25);color:rgba(255,255,255,0.6)}
+  .btn-weather{display:inline-flex;align-items:center;gap:7px;padding:0.55rem 1rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.78rem;color:rgba(255,255,255,0.45);cursor:pointer;transition:all 0.15s;margin-bottom:0.5rem}
+  .btn-weather:hover{border-color:rgba(200,169,110,0.3);color:var(--acento)}
+  .alert-card{border-radius:14px;padding:1.25rem;margin-bottom:1.25rem;border:1px solid}
+  .alert-card.clima{background:rgba(200,169,110,0.07);border-color:rgba(200,169,110,0.18)}
+  .alert-card.season{background:rgba(45,90,61,0.12);border-color:rgba(45,90,61,0.3)}
+  .alert-emoji{font-size:1.4rem;margin-bottom:0.4rem;display:block}
+  .alert-titulo{font-family:'DM Serif Display',serif;font-size:1.1rem;color:white;font-weight:400;margin-bottom:0.3rem}
+  .alert-desc{font-size:0.8rem;color:rgba(255,255,255,0.45);line-height:1.6}
+  .negocio-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;padding:6px 14px;font-size:0.78rem;color:rgba(255,255,255,0.45);margin-bottom:1.5rem}
+  .negocio-badge strong{color:white}
+  .playlist-portada{border-radius:14px;padding:2rem;margin-bottom:1.5rem;background:linear-gradient(135deg,rgba(26,58,42,0.85) 0%,rgba(13,13,13,0.95) 100%);border:1px solid rgba(45,90,61,0.3);position:relative;overflow:hidden}
+  .playlist-portada::before{content:'';position:absolute;top:-40%;right:-20%;width:300px;height:300px;background:radial-gradient(circle,rgba(200,169,110,0.07) 0%,transparent 70%);pointer-events:none}
+  .pl-ctag{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--acento);margin-bottom:0.75rem;display:block}
+  .pl-nombre{font-family:'DM Serif Display',serif;font-size:1.9rem;color:white;font-weight:400;font-style:italic;line-height:1.2;margin-bottom:0.75rem}
+  .pl-desc{font-size:0.83rem;color:rgba(255,255,255,0.5);line-height:1.7}
+  .pl-meta{display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap}
+  .pl-meta-item{font-family:'Space Mono',monospace;font-size:0.58rem;color:rgba(255,255,255,0.22);letter-spacing:0.1em}
+  .player-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1rem}
+  .np-label{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.2);margin-bottom:0.75rem}
+  .np-titulo{font-size:1rem;font-weight:500;color:white;margin-bottom:0.2rem}
+  .np-artista{font-size:0.82rem;color:rgba(255,255,255,0.4);margin-bottom:1rem}
+  .player-controls{display:flex;align-items:center;justify-content:center;gap:1rem}
+  .btn-ctrl{background:transparent;border:none;color:rgba(255,255,255,0.5);cursor:pointer;transition:all 0.15s;padding:8px;border-radius:50%;font-size:1rem}
+  .btn-ctrl:hover{color:white;background:rgba(255,255,255,0.06)}
+  .btn-play-main{background:var(--acento)!important;color:#0d0d0d!important;width:44px;height:44px;border-radius:50%!important;display:flex;align-items:center;justify-content:center}
+  .btn-play-main:hover{background:#d4b87a!important;transform:scale(1.05)}
+  .progress-bar{height:2px;background:rgba(255,255,255,0.08);border-radius:999px;margin:1rem 0;cursor:pointer}
+  .progress-fill{height:100%;background:var(--acento);border-radius:999px;transition:width 0.5s linear;width:0%}
+  .progress-times{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.58rem;color:rgba(255,255,255,0.2)}
+  .spotify-err-msg{background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.14);border-radius:10px;padding:1rem;font-size:0.8rem;color:rgba(255,255,255,0.4);text-align:center;line-height:1.6;margin-bottom:1rem}
+  .songs-header{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.2);margin-bottom:0.75rem;display:flex;align-items:center;gap:10px}
+  .songs-header::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.05)}
+  .song-item{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:0.9rem;padding:0.7rem 0.85rem;border-radius:8px;cursor:pointer;transition:background 0.15s}
+  .song-item:hover{background:rgba(255,255,255,0.04)}.song-item.playing{background:rgba(200,169,110,0.07)}
+  .song-num{font-family:'Space Mono',monospace;font-size:0.6rem;color:rgba(255,255,255,0.18);text-align:right}
+  .song-item.playing .song-num,.song-item.playing .song-titulo{color:var(--acento)}
+  .song-titulo{font-size:0.85rem;font-weight:500;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .song-artista{font-size:0.75rem;color:rgba(255,255,255,0.35);margin-top:1px}
+  .song-genero{font-size:0.65rem;color:rgba(200,169,110,0.7);background:rgba(200,169,110,0.07);border:1px solid rgba(200,169,110,0.14);padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .saved-item{display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all 0.15s;margin-bottom:8px}
+  .saved-item:hover{border-color:rgba(200,169,110,0.2)}
+  .saved-nombre{font-family:'DM Serif Display',serif;font-size:0.95rem;color:white;font-style:italic}
+  .saved-meta{font-size:0.7rem;color:rgba(255,255,255,0.25);margin-top:2px}
+  .btn-del{background:transparent;border:none;color:rgba(255,255,255,0.15);cursor:pointer;font-size:0.9rem;padding:4px 8px;border-radius:4px;transition:all 0.15s}
+  .btn-del:hover{color:#e74c3c;background:rgba(231,76,60,0.08)}
+  .empty-msg{font-size:0.82rem;color:rgba(255,255,255,0.18);text-align:center;padding:2rem;font-style:italic}
+  .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(13,13,13,0.97);border-top:1px solid rgba(255,255,255,0.07);display:flex;justify-content:space-around;padding:0.75rem 0 1rem;z-index:100;backdrop-filter:blur(10px)}
+  .nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;background:transparent;border:none;cursor:pointer;padding:4px 20px;transition:all 0.15s}
+  .nav-item span:first-child{font-size:1.1rem}
+  .nav-item span:last-child{font-family:'Space Mono',monospace;font-size:0.52rem;color:rgba(255,255,255,0.25);letter-spacing:0.08em;text-transform:uppercase}
+  .nav-item.active span:last-child{color:var(--acento)}
+  .loading-overlay{display:none;position:fixed;inset:0;background:rgba(13,13,13,0.97);z-index:999;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem}
+  .loading-titulo{font-family:'DM Serif Display',serif;font-size:1.4rem;color:white;font-weight:400;margin-bottom:0.5rem}
+  .loading-msg{font-family:'Space Mono',monospace;font-size:0.65rem;color:rgba(255,255,255,0.3);letter-spacing:0.1em;margin-bottom:1.5rem}
+  .loading-bar{height:1px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;max-width:260px;margin:0 auto}
+  .loading-bar-inner{height:100%;background:var(--acento);border-radius:999px;animation:lbar 1.4s ease-in-out infinite;width:35%}
+  @keyframes lbar{0%{transform:translateX(-100%)}100%{transform:translateX(380%)}}
+
+  /* LOGIN SCREEN */
+  .login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center}
+  .login-logo{font-family:'DM Serif Display',serif;font-size:3.5rem;color:white;letter-spacing:-1px;margin-bottom:0.5rem}
+  .login-tagline{font-size:0.85rem;color:rgba(255,255,255,0.35);margin-bottom:3rem;line-height:1.6;max-width:320px}
+  .login-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;width:100%;max-width:360px}
+  .login-sep{display:flex;align-items:center;gap:12px;margin:1.25rem 0}
+  .login-sep::before,.login-sep::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.08)}
+  .login-sep span{font-size:0.72rem;color:rgba(255,255,255,0.2);font-family:'Space Mono',monospace}
+  .login-field{margin-bottom:0.9rem}
+  .login-field input{width:100%;padding:0.7rem 0.9rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.88rem;color:white;outline:none;transition:border-color 0.2s}
+  .login-field input::placeholder{color:rgba(255,255,255,0.2)}
+  .login-field input:focus{border-color:rgba(200,169,110,0.4);background:rgba(255,255,255,0.07)}
+  .btn-login-email{width:100%;padding:0.85rem;background:var(--acento);color:#0d0d0d;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:0.92rem;font-weight:500;cursor:pointer;transition:all 0.2s;margin-top:0.25rem}
+  .btn-login-email:hover{background:#d4b87a}
+  .login-toggle{font-size:0.78rem;color:rgba(255,255,255,0.3);margin-top:1rem;cursor:pointer;transition:color 0.15s}
+  .login-toggle:hover{color:rgba(255,255,255,0.6)}
+  .login-toggle span{color:var(--acento)}
+  .login-err{font-size:0.78rem;color:#e74c3c;margin-top:0.5rem;text-align:center}
+  .trial-badge{display:inline-block;background:rgba(200,169,110,0.12);border:1px solid rgba(200,169,110,0.25);border-radius:999px;padding:5px 14px;font-size:0.72rem;color:var(--acento);margin-bottom:1.5rem;font-family:'Space Mono',monospace;letter-spacing:0.05em}
+
+  @media(max-width:480px){.grid-2{grid-template-columns:1fr}.pl-nombre{font-size:1.5rem}.song-genero{display:none}.main{padding:1.5rem 1rem 6rem}}
+</style>
+</head>
+<body>
+
+<!-- ===== SCREEN: LOGIN ===== -->
+<div class="screen active" id="screen-login">
+  <div class="login-wrap">
+    <div class="login-logo">Partícula</div>
+    <div class="login-tagline">La identidad sonora de tu negocio.<br>Curada por IA, única para tu lugar.</div>
+    <div class="trial-badge">✦ 7 días gratis · después $299/mes</div>
+
+    <div class="login-card">
+      <button class="btn-spotify" onclick="connectSpotify()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        Continuar con Spotify
+      </button>
+
+      <div class="login-sep"><span>o con correo</span></div>
+
+      <div id="login-form">
+        <div class="login-field"><input type="email" id="l-email" placeholder="correo@tuempresa.com"></div>
+        <div class="login-field"><input type="password" id="l-pass" placeholder="Contraseña"></div>
+        <button class="btn-login-email" onclick="loginEmail()">Iniciar sesión</button>
+        <div class="login-err" id="l-err" style="display:none"></div>
+        <div class="login-toggle" onclick="toggleAuthMode()">¿No tienes cuenta? <span>Crear una gratis</span></div>
+      </div>
+
+      <div id="signup-form" style="display:none">
+        <div class="login-field"><input type="email" id="s-email" placeholder="correo@tuempresa.com"></div>
+        <div class="login-field"><input type="password" id="s-pass" placeholder="Crea una contraseña"></div>
+        <div class="login-field"><input type="password" id="s-pass2" placeholder="Confirma tu contraseña"></div>
+        <button class="btn-login-email" onclick="signupEmail()">Crear cuenta gratis</button>
+        <div class="login-err" id="s-err" style="display:none"></div>
+        <div class="login-toggle" onclick="toggleAuthMode()">¿Ya tienes cuenta? <span>Iniciar sesión</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN: ONBOARDING ===== -->
+<div class="screen" id="screen-onboarding">
+  <div class="header">
+    <div style="display:flex;align-items:baseline"><span class="logo">Partícula</span><span class="logo-badge">setup</span></div>
+    <button class="btn-logout" onclick="logout()">Salir</button>
+  </div>
+  <div class="main">
+    <div class="steps-bar" id="ob-steps"></div>
+
+    <!-- PASO 1 -->
+    <div id="ob-1">
+      <span class="tag">01 — tu negocio</span>
+      <div class="titulo">Cuéntanos sobre tu lugar</div>
+      <div class="subtitulo">Este perfil se llena una sola vez. Después solo generas la playlist del día.</div>
+      <div class="card">
+        <div class="field"><label>Nombre del negocio</label><input id="ob-nombre" type="text" placeholder="Ej. Café Almendra" oninput="chkOb(1)"></div>
+        <div class="field"><label>Tipo de negocio</label>
+          <select id="ob-tipo" onchange="chkOb(1)">
+            <option value="">Selecciona...</option>
+            <option>Cafetería / Café</option><option>Restaurante</option><option>Bar / Cervecería</option>
+            <option>Tienda de ropa</option><option>Tienda gourmet / especialidad</option><option>Hotel / Lobby</option>
+            <option>Spa / Wellness</option><option>Gimnasio</option><option>Consultorio / Clínica</option>
+            <option>Restaurante de comida rápida</option><option>Oficina / Coworking</option><option>Otro</option>
+          </select>
+        </div>
+        <div class="field"><label>Especifica más <span>opcional</span></label><input id="ob-subtipo" type="text" placeholder="Ej. Cafetería de especialidad, sushi bar..."></div>
+        <div class="field"><label>Ciudad principal</label><input id="ob-ciudad" type="text" placeholder="Ej. León, Guanajuato" oninput="chkOb(1)"></div>
+      </div>
+      <div class="nav-btns"><button class="btn-primary" id="ob-btn-1" onclick="obNext(2)" disabled>Continuar →</button></div>
+    </div>
+
+    <!-- PASO 2 -->
+    <div id="ob-2" style="display:none">
+      <span class="tag">02 — tu cliente</span>
+      <div class="titulo">¿Quién está en tu lugar?</div>
+      <div class="subtitulo">La música habla directamente a ellos.</div>
+      <div class="card">
+        <div class="field">
+          <label>Rango de edad de tu cliente</label>
+          <div class="age-wrap">
+            <select id="ob-edad-min" onchange="chkOb(2)">
+              <option value="">De...</option>
+              <option>15</option><option>16</option><option>17</option><option>18</option><option>19</option>
+              <option>20</option><option>21</option><option>22</option><option>23</option><option>24</option>
+              <option>25</option><option>26</option><option>27</option><option>28</option><option>29</option>
+              <option>30</option><option>31</option><option>32</option><option>33</option><option>34</option>
+              <option>35</option><option>36</option><option>37</option><option>38</option><option>39</option>
+              <option>40</option><option>41</option><option>42</option><option>43</option><option>44</option>
+              <option>45</option><option>46</option><option>47</option><option>48</option><option>49</option>
+              <option>50</option><option>51</option><option>52</option><option>53</option><option>54</option>
+              <option>55</option><option>56</option><option>57</option><option>58</option><option>59</option>
+              <option>60</option><option>61</option><option>62</option><option>63</option><option>64</option>
+              <option>65</option><option>66</option><option>67</option><option>68</option><option>69</option><option>70</option>
+            </select>
+            <span class="age-sep">a</span>
+            <select id="ob-edad-max" onchange="chkOb(2)">
+              <option value="">...años</option>
+              <option>15</option><option>16</option><option>17</option><option>18</option><option>19</option>
+              <option>20</option><option>21</option><option>22</option><option>23</option><option>24</option>
+              <option>25</option><option>26</option><option>27</option><option>28</option><option>29</option>
+              <option>30</option><option>31</option><option>32</option><option>33</option><option>34</option>
+              <option>35</option><option>36</option><option>37</option><option>38</option><option>39</option>
+              <option>40</option><option>41</option><option>42</option><option>43</option><option>44</option>
+              <option>45</option><option>46</option><option>47</option><option>48</option><option>49</option>
+              <option>50</option><option>51</option><option>52</option><option>53</option><option>54</option>
+              <option>55</option><option>56</option><option>57</option><option>58</option><option>59</option>
+              <option>60</option><option>61</option><option>62</option><option>63</option><option>64</option>
+              <option>65</option><option>66</option><option>67</option><option>68</option><option>69</option><option>70</option>
+            </select>
+          </div>
+          <div class="age-hints">
+            <span class="age-hint" onclick="setAge(20,30)">20s</span>
+            <span class="age-hint" onclick="setAge(30,40)">30s</span>
+            <span class="age-hint" onclick="setAge(40,50)">40s</span>
+            <span class="age-hint" onclick="setAge(50,60)">50s</span>
+            <span class="age-hint" onclick="setAge(18,35)">Jóvenes adultos</span>
+            <span class="age-hint" onclick="setAge(25,45)">Adultos</span>
+            <span class="age-hint" onclick="setAge(15,70)">Todos</span>
+          </div>
+        </div>
+        <div class="field"><label>Género predominante</label>
+          <div class="chips" id="chips-gcliente">
+            <div class="chip" onclick="chip('gcliente',this,'Mayormente femenino')">Mayormente femenino</div>
+            <div class="chip" onclick="chip('gcliente',this,'Mayormente masculino')">Mayormente masculino</div>
+            <div class="chip" onclick="chip('gcliente',this,'Equilibrado')">Equilibrado</div>
+          </div>
+        </div>
+        <div class="field"><label>¿A qué se dedican tus clientes? ¿Por qué vienen a tu lugar?</label>
+          <textarea id="ob-cdesc" placeholder="Ej. Profesionistas que vienen a trabajar o a reunirse con colegas. Buscan un ambiente tranquilo pero con energía." oninput="chkOb(2)"></textarea>
+        </div>
+        <div class="field"><label>Describe a tu cliente ideal</label>
+          <textarea id="ob-cideal" placeholder="Ej. Emprendedor de 32 años, cuida mucho los detalles, le gusta lo auténtico, viene seguido entre semana y suele quedarse más de una hora." oninput="chkOb(2)"></textarea>
+        </div>
+      </div>
+      <div class="nav-btns"><button class="btn-back" onclick="obPrev(1)">← Atrás</button><button class="btn-primary" id="ob-btn-2" onclick="obNext(3)" disabled>Continuar →</button></div>
+    </div>
+
+    <!-- PASO 3 -->
+    <div id="ob-3" style="display:none">
+      <span class="tag">03 — identidad</span>
+      <div class="titulo">¿Cómo quieres que se sienta tu lugar?</div>
+      <div class="subtitulo">No hablamos de géneros. Hablamos de sensaciones.</div>
+      <div class="card">
+        <div class="field"><label>Vibe y atmósfera que quieres proyectar</label>
+          <textarea id="ob-vibe" placeholder="Ej. Cálido y acogedor pero con actitud. Un lugar donde el tiempo se detiene pero todo está lleno de vida." oninput="chkOb(3)"></textarea>
+        </div>
+        <div class="field"><label>Marcas o lugares que te inspiran <span>opcional</span></label>
+          <input id="ob-refs" type="text" placeholder="Ej. Blue Bottle, Ace Hotel, Mercado Roma...">
+        </div>
+      </div>
+      <div class="nav-btns"><button class="btn-back" onclick="obPrev(2)">← Atrás</button><button class="btn-primary" id="ob-btn-3" onclick="obNext(4)" disabled>Continuar →</button></div>
+    </div>
+
+    <!-- PASO 4 -->
+    <div id="ob-4" style="display:none">
+      <span class="tag">04 — el espacio</span>
+      <div class="titulo">Cuéntanos sobre el lugar físico</div>
+      <div class="subtitulo">Esto define el tempo y la energía de lo que suene ahí.</div>
+      <div class="card">
+        <div class="field"><label>¿Cuánto tiempo promedio pasa tu cliente?</label>
+          <div class="chips" id="chips-permanencia">
+            <div class="chip" onclick="chip('permanencia',this,'Menos de 20 minutos')">Menos de 20 min</div>
+            <div class="chip" onclick="chip('permanencia',this,'20 a 45 minutos')">20–45 min</div>
+            <div class="chip" onclick="chip('permanencia',this,'45 minutos a 2 horas')">45 min–2 hrs</div>
+            <div class="chip" onclick="chip('permanencia',this,'Más de 2 horas')">Más de 2 hrs</div>
+          </div>
+        </div>
+        <div class="field"><label>Nivel de ruido ambiente</label>
+          <div class="chips" id="chips-ruido">
+            <div class="chip" onclick="chip('ruido',this,'Muy silencioso')">Muy silencioso</div>
+            <div class="chip" onclick="chip('ruido',this,'Moderado')">Moderado</div>
+            <div class="chip" onclick="chip('ruido',this,'Ruidoso')">Ruidoso</div>
+          </div>
+        </div>
+        <div class="field"><label>¿Hay momentos del día con dinámica muy distinta?</label>
+          <div class="chips" id="chips-dinamica">
+            <div class="chip" onclick="chip('dinamica',this,'No, es consistente todo el día')">No, es consistente</div>
+            <div class="chip" onclick="chip('dinamica',this,'Sí, cambia bastante durante el día')">Sí, cambia bastante</div>
+          </div>
+        </div>
+        <div class="field"><label>Estética visual del lugar</label>
+          <textarea id="ob-estetica" placeholder="Ej. Industrial con madera cálida, plantas y luz natural. Mezcla de moderno y rústico." oninput="chkOb(4)"></textarea>
+        </div>
+        <div class="field"><label>Géneros o artistas que NO quieres en tu lugar <span>opcional</span></label>
+          <input id="ob-nowant" type="text" placeholder="Ej. Reggaetón, corridos, música muy comercial...">
+        </div>
+      </div>
+      <div class="nav-btns"><button class="btn-back" onclick="obPrev(3)">← Atrás</button><button class="btn-primary" id="ob-btn-4" onclick="obNext(5)" disabled>Continuar →</button></div>
+    </div>
+
+    <!-- PASO 5 -->
+    <div id="ob-5" style="display:none">
+      <span class="tag">05 — operación</span>
+      <div class="titulo">¿Cómo operas?</div>
+      <div class="subtitulo">Nos ayuda a entender el ritmo de tu lugar.</div>
+      <div class="card">
+        <div class="field"><label>Horario de apertura</label>
+          <div class="chips" id="chips-horarioop">
+            <div class="chip" onclick="chip('horarioop',this,'Solo mañanas (7am–1pm)')">Solo mañanas</div>
+            <div class="chip" onclick="chip('horarioop',this,'Mañana y tarde (7am–6pm)')">Mañana y tarde</div>
+            <div class="chip" onclick="chip('horarioop',this,'Todo el día (8am–9pm)')">Todo el día</div>
+            <div class="chip" onclick="chip('horarioop',this,'Tarde y noche (2pm–11pm)')">Tarde y noche</div>
+            <div class="chip" onclick="chip('horarioop',this,'Solo fines de semana')">Fines de semana</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-btns"><button class="btn-back" onclick="obPrev(4)">← Atrás</button><button class="btn-primary" id="ob-btn-5" onclick="finalizarOb()" disabled>Guardar perfil →</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN: HOME ===== -->
+<div class="screen" id="screen-home">
+  <div class="header">
+    <span class="logo">Partícula</span>
+    <button class="btn-logout" onclick="logout()">Salir</button>
+  </div>
+  <div class="main">
+    <div id="home-badge" class="negocio-badge"></div>
+    <div id="home-season"></div>
+    <div id="home-clima-alert"></div>
+    <span class="tag">playlist del día</span>
+    <div class="titulo" id="home-saludo">Buenos días</div>
+    <div class="subtitulo" id="home-sub">¿Qué mood le ponemos hoy?</div>
+    <div class="card">
+      <div class="field"><label>Horario de hoy</label>
+        <div class="chips" id="chips-hhorario">
+          <div class="chip" onclick="chip('hhorario',this,'Mañana (7am–12pm)')">Mañana</div>
+          <div class="chip" onclick="chip('hhorario',this,'Mediodía (12pm–3pm)')">Mediodía</div>
+          <div class="chip" onclick="chip('hhorario',this,'Tarde (3pm–7pm)')">Tarde</div>
+          <div class="chip" onclick="chip('hhorario',this,'Noche (7pm–11pm)')">Noche</div>
+          <div class="chip" onclick="chip('hhorario',this,'Todo el día')">Todo el día</div>
+        </div>
+      </div>
+      <div class="field"><label>¿Qué quieres lograr hoy con la música?</label>
+        <div class="chips" id="chips-hmood">
+          <div class="chip" onclick="chip('hmood',this,'Que se queden más tiempo y estén cómodos')">Que se queden más</div>
+          <div class="chip" onclick="chip('hmood',this,'Energía y dinamismo')">Energía</div>
+          <div class="chip" onclick="chip('hmood',this,'Concentración y trabajo')">Concentración</div>
+          <div class="chip" onclick="chip('hmood',this,'Bajar ansiedad y relajar')">Relajar</div>
+          <div class="chip" onclick="chip('hmood',this,'Ambiente festivo y social')">Festivo</div>
+          <div class="chip" onclick="chip('hmood',this,'Sofisticación y experiencia premium')">Premium</div>
+        </div>
+      </div>
+      <div class="field"><label>Duración</label>
+        <select id="h-dur">
+          <option value="1">1 hora (~15 canciones)</option>
+          <option value="2">2 horas (~30 canciones)</option>
+          <option value="4" selected>4 horas (~60 canciones)</option>
+          <option value="6">6 horas (~90 canciones)</option>
+          <option value="8">8 horas (~120 canciones)</option>
+        </select>
+      </div>
+      <div class="field"><label>Clima actual</label>
+        <button class="btn-weather" onclick="detectClima()"><span id="clima-btn">📍 Detectar clima</span></button>
+        <div class="chips" id="chips-hclima">
+          <div class="chip" onclick="chip('hclima',this,'soleado')">☀️ Soleado</div>
+          <div class="chip" onclick="chip('hclima',this,'nublado')">⛅ Nublado</div>
+          <div class="chip" onclick="chip('hclima',this,'lluvioso')">🌧️ Lluvioso</div>
+          <div class="chip" onclick="chip('hclima',this,'frío')">🌬️ Frío</div>
+          <div class="chip" onclick="chip('hclima',this,'caluroso')">🌡️ Caluroso</div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-btns"><button class="btn-primary" id="btn-gen" onclick="generar()" disabled>✨ Generar playlist del día</button></div>
+    <div style="margin-top:1rem;text-align:center">
+      <button class="btn-secondary" style="font-size:0.78rem;padding:0.5rem 1rem" onclick="editarPerfil()">⚙ Editar perfil del negocio</button>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-item active" id="nav-h" onclick="showTab('home')"><span>🎵</span><span>Generar</span></button>
+    <button class="nav-item" id="nav-s" onclick="showTab('saved')"><span>💾</span><span>Guardadas</span></button>
+  </div>
+</div>
+
+<!-- ===== SCREEN: PLAYLIST ===== -->
+<div class="screen" id="screen-playlist">
+  <div class="header">
+    <span class="logo">Partícula</span>
+    <button class="btn-secondary" onclick="goHome()" style="font-size:0.78rem;padding:0.5rem 0.9rem">← Volver</button>
+  </div>
+  <div class="main">
+    <div class="playlist-portada">
+      <span class="pl-ctag" id="pl-ctag">partícula</span>
+      <div class="pl-nombre" id="pl-nombre">—</div>
+      <div class="pl-desc" id="pl-desc">—</div>
+      <div class="pl-meta"><span class="pl-meta-item" id="pl-m1">—</span><span class="pl-meta-item" id="pl-m2">—</span><span class="pl-meta-item" id="pl-m3">—</span></div>
+    </div>
+    <div id="player-wrap" class="player-card">
+      <div class="np-label">reproduciendo ahora</div>
+      <div class="np-titulo" id="np-tit">—</div>
+      <div class="np-artista" id="np-art">—</div>
+      <div class="progress-bar" onclick="seekP(event)"><div class="progress-fill" id="prog-fill"></div></div>
+      <div class="progress-times"><span id="prog-cur">0:00</span><span id="prog-tot">0:00</span></div>
+      <div class="player-controls">
+        <button class="btn-ctrl" onclick="prevT()">⏮</button>
+        <button class="btn-ctrl btn-play-main" id="btn-pp" onclick="togPlay()">▶</button>
+        <button class="btn-ctrl" onclick="nextT()">⏭</button>
+      </div>
+    </div>
+    <div id="spotify-err" class="spotify-err-msg" style="display:none">
+      Conecta Spotify Premium para reproducir aquí.<br>
+      <button onclick="connectSpotify()" style="margin-top:0.75rem;padding:0.5rem 1rem;background:var(--acento);color:#0d0d0d;border:none;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.8rem;font-weight:500">Conectar Spotify</button>
+    </div>
+    <div style="display:flex;gap:0.75rem;margin:1rem 0">
+      <button class="btn-secondary" style="flex:1" onclick="savePlaylist()">💾 Guardar</button>
+      <button class="btn-primary" style="flex:1" onclick="goHome()">Nueva playlist</button>
+    </div>
+    <div class="songs-header">canciones · <span id="pl-count">0</span></div>
+    <div id="pl-songs"></div>
+  </div>
+</div>
+
+<!-- ===== SCREEN: SAVED ===== -->
+<div class="screen" id="screen-saved">
+  <div class="header"><span class="logo">Partícula</span><button class="btn-logout" onclick="logout()">Salir</button></div>
+  <div class="main">
+    <span class="tag">mis playlists</span>
+    <div class="titulo">Guardadas</div>
+    <div class="subtitulo" style="margin-bottom:1.5rem">Tus playlists curadas listas para reproducir.</div>
+    <div id="saved-wrap"></div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-item" id="nav-h2" onclick="showTab('home')"><span>🎵</span><span>Generar</span></button>
+    <button class="nav-item active" id="nav-s2" onclick="showTab('saved')"><span>💾</span><span>Guardadas</span></button>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-overlay" class="loading-overlay">
+  <div class="loading-titulo">Creando tu playlist...</div>
+  <div class="loading-msg" id="loading-msg">Analizando el perfil del negocio...</div>
+  <div class="loading-bar"><div class="loading-bar-inner"></div></div>
+</div>
+
+<script>
+const CLIENT_ID='eac6203085c54d429dbef07f1f236734';
+const REDIRECT='https://emmdthree-del.github.io/particula-app';
+const SCOPES='streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state';
+const LMSGS=['Analizando el perfil del negocio...','Entendiendo a tu cliente...','Explorando música de todo el mundo...','Construyendo la secuencia perfecta...','Afinando el mood del momento...','Último toque de criterio...'];
+
+const S={perfil:null,token:null,player:null,deviceId:null,playerReady:false,current:null,saved:[],chips:{},obPaso:1,loadInt:null,songIdx:0,lastClima:null,user:null};
+
+// AUTH MODE
+let isSignup=false;
+function toggleAuthMode(){
+  isSignup=!isSignup;
+  document.getElementById('login-form').style.display=isSignup?'none':'block';
+  document.getElementById('signup-form').style.display=isSignup?'block':'none';
+}
+
+function loginEmail(){
+  const email=document.getElementById('l-email').value.trim();
+  const pass=document.getElementById('l-pass').value;
+  if(!email||!pass){showErr('l-err','Ingresa tu correo y contraseña');return;}
+  const users=JSON.parse(localStorage.getItem('p_users')||'{}');
+  if(!users[email]){showErr('l-err','No encontramos esa cuenta');return;}
+  if(users[email].pass!==btoa(pass)){showErr('l-err','Contraseña incorrecta');return;}
+  S.user={email};sessionStorage.setItem('p_user',email);
+  afterLogin();
+}
+
+function signupEmail(){
+  const email=document.getElementById('s-email').value.trim();
+  const pass=document.getElementById('s-pass').value;
+  const pass2=document.getElementById('s-pass2').value;
+  if(!email||!pass){showErr('s-err','Ingresa tu correo y contraseña');return;}
+  if(pass!==pass2){showErr('s-err','Las contraseñas no coinciden');return;}
+  if(pass.length<6){showErr('s-err','La contraseña debe tener al menos 6 caracteres');return;}
+  const users=JSON.parse(localStorage.getItem('p_users')||'{}');
+  if(users[email]){showErr('s-err','Ya existe una cuenta con ese correo');return;}
+  users[email]={pass:btoa(pass),created:Date.now()};
+  localStorage.setItem('p_users',JSON.stringify(users));
+  S.user={email};sessionStorage.setItem('p_user',email);
+  afterLogin();
+}
+
+function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
+
+function afterLogin(){
+  S.saved=JSON.parse(localStorage.getItem(`psaved_${S.user?.email||'sp'}`)||'[]');
+  S.perfil=JSON.parse(localStorage.getItem(`pperfil_${S.user?.email||'sp'}`)||'null');
+  S.lastClima=localStorage.getItem('plclima');
+  buildSteps();
+  if(S.token)initPlayer();
+  if(S.perfil){showScr('home');initHome();}else{showScr('onboarding');}
+}
+
+function logout(){
+  sessionStorage.removeItem('p_user');sessionStorage.removeItem('ptk');
+  S.user=null;S.token=null;S.player=null;S.playerReady=false;S.perfil=null;
+  showScr('login');
+}
+
+// SPOTIFY
+function connectSpotify(){
+  window.location.href=`https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT)}&scope=${encodeURIComponent(SCOPES)}`;
+}
+
+function initPlayer(){
+  if(!S.token)return;
+  window.onSpotifyWebPlaybackSDKReady=()=>{
+    const p=new Spotify.Player({name:'Partícula',getOAuthToken:cb=>cb(S.token),volume:0.8});
+    p.addListener('ready',({device_id})=>{S.deviceId=device_id;S.playerReady=true;});
+    p.addListener('player_state_changed',st=>{if(st)updatePUI(st);});
+    p.addListener('authentication_error',()=>{sessionStorage.removeItem('ptk');S.token=null;S.playerReady=false;});
+    p.connect();S.player=p;
+  };
+  if(!document.getElementById('spk')){const sc=document.createElement('script');sc.id='spk';sc.src='https://sdk.scdn.co/spotify-player.js';document.head.appendChild(sc);}
+}
+
+async function playSpotify(idx){
+  if(!S.playerReady||!S.deviceId||!S.current)return;
+  const song=S.current.songs[idx];
+  try{
+    const r=await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(song.title+' '+song.artist)}&type=track&limit=1`,{headers:{'Authorization':'Bearer '+S.token}});
+    const d=await r.json();const tr=d.tracks?.items?.[0];if(!tr)return;
+    await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${S.deviceId}`,{method:'PUT',headers:{'Authorization':'Bearer '+S.token,'Content-Type':'application/json'},body:JSON.stringify({uris:[tr.uri]})});
+  }catch(e){}
+}
+
+function updatePUI(st){
+  if(!st||!st.track_window?.current_track)return;
+  const tr=st.track_window.current_track;
+  document.getElementById('np-tit').textContent=tr.name;
+  document.getElementById('np-art').textContent=tr.artists.map(a=>a.name).join(', ');
+  document.getElementById('btn-pp').textContent=st.paused?'▶':'⏸';
+  const pct=st.duration?(st.position/st.duration*100):0;
+  document.getElementById('prog-fill').style.width=pct+'%';
+  document.getElementById('prog-cur').textContent=fmtT(st.position);
+  document.getElementById('prog-tot').textContent=fmtT(st.duration);
+}
+
+function fmtT(ms){const s=Math.floor(ms/1000);return`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
+async function togPlay(){if(S.player)await S.player.togglePlay();}
+async function nextT(){if(S.player&&S.playerReady){await S.player.nextTrack();}else{S.songIdx=Math.min(S.songIdx+1,(S.current?.songs.length||1)-1);hlSong(S.songIdx);}}
+async function prevT(){if(S.player&&S.playerReady){await S.player.previousTrack();}else{S.songIdx=Math.max(S.songIdx-1,0);hlSong(S.songIdx);}}
+function seekP(e){if(!S.player)return;const r=e.offsetX/e.currentTarget.offsetWidth;S.player.getCurrentState().then(st=>{if(st)S.player.seek(st.duration*r);});}
+
+// CHIPS & AGE
+function chip(g,el,v){
+  document.querySelectorAll(`#chips-${g} .chip`).forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');S.chips[g]=v;chkOb(S.obPaso);chkHome();
+}
+
+function setAge(min,max){
+  document.getElementById('ob-edad-min').value=min;
+  document.getElementById('ob-edad-max').value=max;
+  chkOb(2);
+}
+
+// ONBOARDING
+function buildSteps(){
+  const el=document.getElementById('ob-steps');
+  el.innerHTML=[1,2,3,4,5].map(i=>`<div class="dot ${i===1?'activo':''}" id="obdot${i}"></div>`).join('');
+}
+
+function chkOb(p){
+  const min=document.getElementById('ob-edad-min')?.value;
+  const max=document.getElementById('ob-edad-max')?.value;
+  const c={
+    1:()=>document.getElementById('ob-nombre').value.trim()&&document.getElementById('ob-tipo').value&&document.getElementById('ob-ciudad').value.trim(),
+    2:()=>min&&max&&S.chips.gcliente&&document.getElementById('ob-cdesc').value.trim().length>10&&document.getElementById('ob-cideal').value.trim().length>10,
+    3:()=>document.getElementById('ob-vibe').value.trim().length>10,
+    4:()=>S.chips.permanencia&&S.chips.ruido&&document.getElementById('ob-estetica').value.trim().length>5,
+    5:()=>S.chips.horarioop,
+  };
+  const btn=document.getElementById(`ob-btn-${p}`);
+  if(btn&&c[p])btn.disabled=!c[p]();
+}
+
+['ob-nombre','ob-ciudad'].forEach(id=>document.getElementById(id)?.addEventListener('input',()=>chkOb(1)));
+
+function obNext(n){
+  document.getElementById(`ob-${S.obPaso}`).style.display='none';
+  document.getElementById(`obdot${S.obPaso}`).className='dot completo';
+  S.obPaso=n;
+  document.getElementById(`ob-${n}`).style.display='block';
+  document.getElementById(`obdot${n}`).className='dot activo';
+  window.scrollTo({top:0,behavior:'smooth'});chkOb(n);
+}
+
+function obPrev(n){
+  document.getElementById(`ob-${S.obPaso}`).style.display='none';
+  document.getElementById(`obdot${S.obPaso}`).className='dot';
+  S.obPaso=n;
+  document.getElementById(`ob-${n}`).style.display='block';
+  document.getElementById(`obdot${n}`).className='dot activo';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function finalizarOb(){
+  const min=document.getElementById('ob-edad-min').value;
+  const max=document.getElementById('ob-edad-max').value;
+  S.perfil={
+    nombre:document.getElementById('ob-nombre').value.trim(),
+    tipo:document.getElementById('ob-tipo').value,
+    subtipo:document.getElementById('ob-subtipo').value.trim(),
+    ciudad:document.getElementById('ob-ciudad').value.trim(),
+    edad:`${min} a ${max} años`,
+    gcliente:S.chips.gcliente||'',
+    cdesc:document.getElementById('ob-cdesc').value.trim(),
+    cideal:document.getElementById('ob-cideal').value.trim(),
+    vibe:document.getElementById('ob-vibe').value.trim(),
+    refs:document.getElementById('ob-refs').value.trim(),
+    permanencia:S.chips.permanencia||'',
+    ruido:S.chips.ruido||'',
+    dinamica:S.chips.dinamica||'',
+    estetica:document.getElementById('ob-estetica').value.trim(),
+    nowant:document.getElementById('ob-nowant').value.trim(),
+    horarioop:S.chips.horarioop||''
+  };
+  const key=`pperfil_${S.user?.email||'sp'}`;
+  localStorage.setItem(key,JSON.stringify(S.perfil));
+  showScr('home');initHome();
+}
+
+// HOME
+function initHome(){
+  const p=S.perfil;if(!p)return;
+  document.getElementById('home-badge').innerHTML=`🎵 <strong>${p.nombre}</strong> · ${p.tipo}`;
+  const h=new Date().getHours();
+  document.getElementById('home-saludo').textContent=h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches';
+  document.getElementById('home-sub').textContent=`¿Qué mood le ponemos hoy a ${p.nombre}?`;
+  checkSeason();detectClima();
+}
+
+function checkSeason(){
+  const m=new Date().getMonth()+1,d=new Date().getDate();
+  let msg=null;
+  if(m===12&&d>=1)msg={e:'🎄',t:'Temporada navideña',d:'Perfecto para darle un toque festivo al sonido de tu lugar.'};
+  else if(m===11&&d<=3)msg={e:'💀',t:'Día de Muertos',d:'Una festividad única. Hay música increíble para estos días.'};
+  else if((m===3&&d>=20)||(m===4&&d<=15))msg={e:'🌸',t:'Llegó la primavera',d:'El cambio de temporada es el momento perfecto para refrescar el sonido.'};
+  else if(m>=6&&m<=8)msg={e:'☀️',t:'Temporada de verano',d:'Los días largos piden un sonido diferente. ¿Lo actualizamos?'};
+  const el=document.getElementById('home-season');
+  if(msg)el.innerHTML=`<div class="alert-card season"><span class="alert-emoji">${msg.e}</span><div class="alert-titulo">${msg.t}</div><div class="alert-desc">${msg.d}</div></div>`;
+}
+
+async function detectClima(){
+  if(!navigator.geolocation)return;
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    try{
+      const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current=weathercode&timezone=auto`);
+      const d=await r.json();const c=d.current.weathercode;
+      let clima='soleado';
+      if(c>=61)clima='lluvioso';else if(c>=45)clima='nublado';else if(c>=1)clima='nublado';
+      const em={soleado:'☀️',nublado:'⛅',lluvioso:'🌧️',frío:'🌬️',caluroso:'🌡️'};
+      document.querySelectorAll('#chips-hclima .chip').forEach(ch=>{if(ch.textContent.toLowerCase().includes(clima)){ch.classList.add('active');S.chips.hclima=clima;}});
+      document.getElementById('clima-btn').textContent=`${em[clima]||'🌤'} ${clima.charAt(0).toUpperCase()+clima.slice(1)} detectado`;
+      chkHome();
+      if(S.lastClima&&S.lastClima!==clima){
+        document.getElementById('home-clima-alert').innerHTML=`<div class="alert-card clima"><span class="alert-emoji">${em[clima]}</span><div class="alert-titulo">El clima cambió</div><div class="alert-desc">Ahora está ${clima} en ${S.perfil?.ciudad||'tu ciudad'}. Puede ser buen momento para cambiar el mood.</div></div>`;
+      }
+      localStorage.setItem('plclima',clima);S.lastClima=clima;
+    }catch(e){}
+  },()=>{});
+}
+
+function chkHome(){
+  const btn=document.getElementById('btn-gen');
+  if(btn)btn.disabled=!(S.chips.hhorario&&S.chips.hmood&&S.chips.hclima);
+}
+
+// GENERATE
+async function generar(){
+  const p=S.perfil;const dur=parseInt(document.getElementById('h-dur').value);const sc=dur*15;
+  showLoad(true);
+  const prompt=`Eres un curador musical experto en sonic branding para negocios. Crea una playlist única, memorable y perfectamente adaptada al momento específico de este negocio.
+
+PERFIL DEL NEGOCIO:
+- Nombre: ${p.nombre}
+- Tipo: ${p.tipo}${p.subtipo?` (${p.subtipo})`:''}
+- Ciudad: ${p.ciudad}
+- Horario de operación: ${p.horarioop}
+
+PERFIL DEL CLIENTE:
+- Edad: ${p.edad} | Género: ${p.gcliente}
+- Descripción: ${p.cdesc}
+- Cliente ideal: ${p.cideal}
+
+IDENTIDAD DEL LUGAR:
+- Vibe: ${p.vibe}${p.refs?`\n- Referencias: ${p.refs}`:''}
+- Estética visual: ${p.estetica}
+- Tiempo del cliente: ${p.permanencia}
+- Ruido ambiente: ${p.ruido}
+- Dinámica del día: ${p.dinamica}
+${p.nowant?`- EXCLUIR COMPLETAMENTE: ${p.nowant}`:''}
+
+CONTEXTO DE HOY:
+- Horario: ${S.chips.hhorario}
+- Objetivo: ${S.chips.hmood}
+- Clima: ${S.chips.hclima}
+- Duración: ${dur} hora(s) = ${sc} canciones
+
+INSTRUCCIONES CRÍTICAS:
+1. La playlist es para el NEGOCIO y su CLIENTE, NO para el dueño
+2. Mezcla artistas de TODO el mundo y TODAS las épocas — no solo artistas de moda
+3. Incluye música en diferentes idiomas cuando encaje con el perfil
+4. El nombre debe ser poético, evocador y único para ESTE negocio en ESTE momento
+5. La descripción (2-3 líneas) describe qué va a pasar en el lugar y cómo se va a sentir el cliente
+6. Géneros muy específicos (ej: "Bossa nova moderna brasileña" no solo "Bossa nova")
+7. Clima influye sutilmente: lluvia = introspectivo y cálido, sol = abierto y brillante
+8. NUNCA uses lo de la lista de exclusión
+9. Genera exactamente ${sc} canciones
+
+Responde ÚNICAMENTE con JSON sin texto adicional ni backticks:
+{"playlistName":"nombre poético","description":"qué pasa en el lugar cuando suena esto","songs":[{"title":"título","artist":"artista","genre":"género específico"}]}`;
+
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const data=await res.json();
+    const txt=data.content?.map(b=>b.text||'').join('')||'';
+    const pl=JSON.parse(txt.replace(/```json|```/g,'').trim());
+    showLoad(false);
+    S.current={...pl,id:Date.now(),negocio:p.nombre,horario:S.chips.hhorario,mood:S.chips.hmood,clima:S.chips.hclima,dur,fecha:new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})};
+    renderPl(S.current);showScr('playlist');
+  }catch(e){showLoad(false);alert('Error al generar. Intenta de nuevo.');}
+}
+
+function renderPl(pl){
+  const em={soleado:'☀️',nublado:'⛅',lluvioso:'🌧️',frío:'🌬️',caluroso:'🌡️'};
+  document.getElementById('pl-ctag').textContent=`partícula · ${pl.fecha} · ${em[pl.clima]||''} ${pl.clima}`;
+  document.getElementById('pl-nombre').textContent=`"${pl.playlistName}"`;
+  document.getElementById('pl-desc').textContent=pl.description;
+  document.getElementById('pl-m1').textContent=pl.negocio;
+  document.getElementById('pl-m2').textContent=pl.horario;
+  document.getElementById('pl-m3').textContent=`${pl.songs.length} canciones · ${pl.dur}h`;
+  document.getElementById('pl-count').textContent=pl.songs.length;
+  if(pl.songs.length>0){document.getElementById('np-tit').textContent=pl.songs[0].title;document.getElementById('np-art').textContent=pl.songs[0].artist;}
+  document.getElementById('player-wrap').style.display=S.playerReady?'block':'none';
+  document.getElementById('spotify-err').style.display=S.playerReady?'none':'block';
+  if(S.playerReady)playSpotify(0);
+  document.getElementById('pl-songs').innerHTML=pl.songs.map((s,i)=>`
+    <div class="song-item ${i===0?'playing':''}" onclick="playSong(${i})">
+      <span class="song-num">${String(i+1).padStart(2,'0')}</span>
+      <div><div class="song-titulo">${s.title}</div><div class="song-artista">${s.artist}</div></div>
+      <span class="song-genero">${s.genre}</span>
+    </div>`).join('');
+}
+
+function playSong(i){S.songIdx=i;hlSong(i);if(S.playerReady)playSpotify(i);else{const s=S.current.songs[i];document.getElementById('np-tit').textContent=s.title;document.getElementById('np-art').textContent=s.artist;}}
+function hlSong(i){document.querySelectorAll('.song-item').forEach((el,j)=>el.classList.toggle('playing',j===i));}
+
+// SAVED
+function savePlaylist(){
+  if(!S.current)return;
+  const key=`psaved_${S.user?.email||'sp'}`;
+  if(!S.saved.find(p=>p.id===S.current.id)){
+    S.saved.push(S.current);localStorage.setItem(key,JSON.stringify(S.saved));
+    const btn=document.querySelector('[onclick="savePlaylist()"]');
+    if(btn){btn.textContent='✓ Guardada';setTimeout(()=>btn.textContent='💾 Guardar',2000);}
+  }
+}
+
+function renderSaved(){
+  const el=document.getElementById('saved-wrap');
+  if(!S.saved.length){el.innerHTML='<div class="empty-msg">Aún no has guardado ninguna playlist.</div>';return;}
+  el.innerHTML=[...S.saved].reverse().map(p=>`
+    <div class="saved-item" onclick="loadSaved(${p.id})">
+      <div><div class="saved-nombre">"${p.playlistName}"</div><div class="saved-meta">${p.negocio} · ${p.songs?.length||0} canciones · ${p.fecha||''}</div></div>
+      <button class="btn-del" onclick="event.stopPropagation();delSaved(${p.id})">✕</button>
+    </div>`).join('');
+}
+
+function loadSaved(id){const p=S.saved.find(x=>x.id===id);if(p){S.current=p;renderPl(p);showScr('playlist');}}
+function delSaved(id){S.saved=S.saved.filter(p=>p.id!==id);const key=`psaved_${S.user?.email||'sp'}`;localStorage.setItem(key,JSON.stringify(S.saved));renderSaved();}
+
+// NAV
+function showScr(n){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(`screen-${n}`).classList.add('active');window.scrollTo({top:0,behavior:'smooth'});if(n==='saved')renderSaved();}
+function showTab(t){
+  showScr(t);
+  ['nav-h','nav-s','nav-h2','nav-s2'].forEach(id=>document.getElementById(id)?.classList.remove('active'));
+  if(t==='home'){document.getElementById('nav-h')?.classList.add('active');document.getElementById('nav-h2')?.classList.add('active');}
+  else{document.getElementById('nav-s')?.classList.add('active');document.getElementById('nav-s2')?.classList.add('active');}
+}
+function goHome(){showScr('home');}
+function editarPerfil(){if(confirm('¿Quieres editar el perfil de tu negocio?')){localStorage.removeItem(`pperfil_${S.user?.email||'sp'}`);S.perfil=null;S.obPaso=1;buildSteps();showScr('onboarding');}}
+function showLoad(show){const el=document.getElementById('loading-overlay');el.style.display=show?'flex':'none';if(show){let i=0;S.loadInt=setInterval(()=>{i=(i+1)%LMSGS.length;document.getElementById('loading-msg').textContent=LMSGS[i];},1800);}else clearInterval(S.loadInt);}
+
+// INIT
+window.onload=()=>{
+  const hash=window.location.hash;
+  if(hash){const p=new URLSearchParams(hash.substring(1));const t=p.get('access_token');if(t){sessionStorage.setItem('ptk',t);window.location.hash='';}}
+  S.token=sessionStorage.getItem('ptk');
+  const savedUser=sessionStorage.getItem('p_user');
+  if(S.token&&!savedUser){S.user={email:'spotify'};sessionStorage.setItem('p_user','spotify');afterLogin();return;}
+  if(savedUser){S.user={email:savedUser};afterLogin();return;}
+  showScr('login');
+};
+</script>
+</body>
+</html>

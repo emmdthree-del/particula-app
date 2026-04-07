@@ -624,7 +624,7 @@ const CATALOG=[
 const S={perfil:null,token:null,refreshToken:null,tokenExpiresAt:null,player:null,deviceId:null,playerReady:false,current:null,saved:[],chips:{},obPaso:1,loadInt:null,songIdx:0,lastClima:null,user:null};
 
 function getRedirectUri(){
-  return window.location.origin + window.location.pathname;
+  return "https://emmdthree-del.github.io/particula-app/";
 }
 function normalizeText(v){
   return (v||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();

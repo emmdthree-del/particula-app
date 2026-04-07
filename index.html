@@ -980,7 +980,7 @@ async function generar(){
       localStorage.getItem('historialPlaylist') || '{"songs":[],"artists":[]}'
     );
 
-    const res = await fetch('/api/generate-playlist', {
+    const res = await fetch('https://particula-app.vercel.app/api/generate-playlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

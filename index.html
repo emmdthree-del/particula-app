@@ -956,16 +956,94 @@ function curateSongs(targetCount){
 
 // GENERATE
 async function generar(){
-  const p=S.perfil;const dur=parseInt(document.getElementById('h-dur').value,10);const sc=dur*15;
+  const p = S.perfil;
+  const dur = parseInt(document.getElementById('h-dur').value, 10);
+  const sc = dur * 15;
+
   showLoad(true);
-  try{
-    await new Promise(r=>setTimeout(r,1200));
-    const songs=curateSongs(sc);
-    const pl={playlistName:generatePlaylistName(),description:generatePlaylistDescription(songs),songs};
+
+  try {
+    let lat = null;
+    let lon = null;
+
+    try {
+      const pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject)
+      );
+      lat = pos.coords.latitude;
+      lon = pos.coords.longitude;
+    } catch (geoErr) {
+      console.warn('No se pudo obtener ubicación', geoErr);
+    }
+
+    const historial = JSON.parse(
+      localStorage.getItem('historialPlaylist') || '{"songs":[],"artists":[]}'
+    );
+
+    const res = await fetch('/api/generate-playlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        perfil: S.perfil,
+        contexto: {
+          lat,
+          lon,
+          horario: S.chips.hhorario,
+          mood: S.chips.hmood,
+          dur,
+          songCount: sc
+        },
+        historial
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error(data);
+      throw new Error(data.error || 'Error generando playlist');
+    }
+
+    const pl = {
+      playlistName: data.playlistName,
+      description: data.description,
+      songs: Array.isArray(data.songs) ? data.songs : []
+    };
+
+    const nuevasSongs = pl.songs.map(s => `${s.title} - ${s.artist}`);
+    const nuevosArtists = pl.songs.map(s => s.artist);
+
+    const historialActualizado = {
+      songs: [...nuevasSongs, ...(historial.songs || [])].slice(0, 200),
+      artists: [...nuevosArtists, ...(historial.artists || [])].slice(0, 100)
+    };
+
+    localStorage.setItem('historialPlaylist', JSON.stringify(historialActualizado));
+
     showLoad(false);
-    S.current={...pl,id:Date.now(),negocio:p.nombre,horario:S.chips.hhorario,mood:S.chips.hmood,clima:S.chips.hclima,dur,fecha:new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})};
-    renderPl(S.current);showScr('playlist');
-  }catch(e){console.error(e);showLoad(false);alert('Error al generar. Intenta de nuevo.');}
+
+    S.current = {
+      ...pl,
+      id: Date.now(),
+      negocio: p.nombre,
+      horario: S.chips.hhorario,
+      mood: S.chips.hmood,
+      clima: S.chips.hclima,
+      dur,
+      fecha: new Date().toLocaleDateString('es-MX', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
+      })
+    };
+
+    renderPl(S.current);
+    showScr('playlist');
+  } catch (e) {
+    console.error(e);
+    showLoad(false);
+    alert('Error al generar. Intenta de nuevo.');
+  }
 }
 
 function renderPl(pl){

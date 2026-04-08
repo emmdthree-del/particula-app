@@ -144,7 +144,7 @@ Devuelve SOLO JSON válido con esta estructura:
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: ''claude-3-haiku-20240307',
         max_tokens: 1500,
         messages: [
           { role: 'user', content: prompt }
@@ -159,7 +159,7 @@ Devuelve SOLO JSON válido con esta estructura:
       return res.status(500).json({ error: 'Error en Anthropic', details: anthropicJson });
     }
 
-    const text = anthropicJson.content?.map(x => x.text || '').join('') || '';
+   const text = anthropicJson.content?.[0]?.text || '';
 
     let parsed;
     try {

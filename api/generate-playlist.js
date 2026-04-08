@@ -151,7 +151,7 @@ Devuelve SOLO JSON válido con esta estructura EXACTA:
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-sonnet-20240229',
+        model: 'claude-sonnet-4-5',
         max_tokens: 1500,
         messages: [
           { role: 'user', content: prompt }

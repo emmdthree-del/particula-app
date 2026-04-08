@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -92,53 +91,19 @@ REGLAS EDITORIALES OBLIGATORIAS:
 9. NO inventes canciones ni artistas.
 10. Devuelve únicamente canciones reales y plausibles.
 11. Evita estas canciones recientes:
-${cancionesRecientes.length ? cancionesRecientes.map(s => `- ${s}`).join('\\n') : '- Ninguna'}
+${cancionesRecientes.length ? cancionesRecientes.map(s => `- ${s}`).join('\n') : '- Ninguna'}
 12. Evita estos artistas recientes:
-${artistasRecientes.length ? artistasRecientes.map(a => `- ${a}`).join('\\n') : '- Ninguno'}
+${artistasRecientes.length ? artistasRecientes.map(a => `- ${a}`).join('\n') : '- Ninguno'}
 
-SALIDA:
-Devuelve únicamente JSON válido, sin markdown, sin explicación, con esta estructura exacta:
+Responde ÚNICAMENTE con JSON válido. No incluyas texto antes ni después. No uses markdown.
+
+Devuelve SOLO JSON válido con esta estructura EXACTA:
+
 {
   "playlistName": "nombre poético",
   "description": "descripción editorial breve",
   "songs": [
     { "title": "título real", "artist": "artista real", "genre": "género específico" }
-  ]
-}
-`.trim();
-
-   try {
-
-     const prompt = `
-Eres un curador musical experto en identidad sonora para negocios.
-
-Crea una playlist con estas condiciones:
-
-NEGOCIO:
-${JSON.stringify(perfil)}
-
-CONTEXTO:
-- Horario: ${contexto.horario}
-- Mood: ${contexto.mood}
-- Duración: ${contexto.dur} horas
-- ${climaTexto}
-
-REGLAS:
-- Evita música comercial o muy conocida
-- Mezcla géneros, países y épocas
-- Mantén coherencia con el negocio
-- No repitas artistas
-- Devuelve canciones reales
-
-Responde ÚNICAMENTE con JSON válido. No incluyas texto antes ni después.
-
-Devuelve SOLO JSON válido con esta estructura EXACTA:
-
-{
-  "playlistName": "",
-  "description": "",
-  "songs": [
-    { "title": "", "artist": "", "genre": "" }
   ]
 }
 `.trim();
@@ -161,33 +126,29 @@ Devuelve SOLO JSON válido con esta estructura EXACTA:
 
     const anthropicJson = await anthropicRes.json();
 
-  if (!anthropicRes.ok) {
-  console.error('Anthropic error FULL:', anthropicJson);
-  return res.status(500).json(anthropicJson);
-}
+    if (!anthropicRes.ok) {
+      console.error('Anthropic error FULL:', anthropicJson);
+      return res.status(500).json(anthropicJson);
+    }
 
-   const text = anthropicJson.content
-  ?.map(block => block.text || '')
-  .join('') || '';
-  const cleanText = text.replace(/```json|```/g, '').trim();
+    const text = anthropicJson.content?.map(block => block.text || '').join('') || '';
+    const cleanText = text.replace(/```json|```/g, '').trim();
 
     let parsed;
     try {
       parsed = JSON.parse(cleanText);
     } catch (e) {
       console.error('JSON parse error:', text);
-      return res.status(500).json({ error: 'Anthropic no devolvió JSON válido', raw: text });
+      return res.status(500).json({
+        error: 'Anthropic no devolvió JSON válido',
+        raw: text
+      });
     }
 
     return res.status(200).json({
       ...parsed,
       clima: climaData
     });
-
-} catch (error) {
-  console.error(error);
-  return res.status(500).json({ error: 'Error generando playlist' });
-} 
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Error generando playlist' });

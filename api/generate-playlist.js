@@ -131,19 +131,36 @@ Devuelve SOLO JSON válido con esta estructura EXACTA:
       return res.status(500).json(anthropicJson);
     }
 
-    const text = anthropicJson.content?.map(block => block.text || '').join('') || '';
-    const cleanText = text.replace(/```json|```/g, '').trim();
+  const text = anthropicJson.content?.map(block => block.text || '').join('') || '';
 
-    let parsed;
-    try {
-      parsed = JSON.parse(cleanText);
-    } catch (e) {
-      console.error('JSON parse error:', text);
-      return res.status(500).json({
-        error: 'Anthropic no devolvió JSON válido',
-        raw: text
-      });
-    }
+const cleanText = text
+  .replace(/```json/gi, '')
+  .replace(/```/g, '')
+  .trim();
+
+// intenta encontrar el primer objeto JSON completo
+const firstBrace = cleanText.indexOf('{');
+const lastBrace = cleanText.lastIndexOf('}');
+
+const jsonCandidate =
+  firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace
+    ? cleanText.slice(firstBrace, lastBrace + 1)
+    : cleanText;
+
+let parsed;
+try {
+  parsed = JSON.parse(jsonCandidate);
+} catch (e) {
+  console.error('JSON parse error RAW:', text);
+  console.error('JSON parse error CLEAN:', cleanText);
+  console.error('JSON parse error CANDIDATE:', jsonCandidate);
+  return res.status(500).json({
+    error: 'Anthropic no devolvió JSON válido',
+    raw: text,
+    cleanText,
+    jsonCandidate
+  });
+}
 
     return res.status(200).json({
       ...parsed,

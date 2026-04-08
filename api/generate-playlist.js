@@ -95,7 +95,7 @@ ${cancionesRecientes.length ? cancionesRecientes.map(s => `- ${s}`).join('\n') :
 12. Evita estos artistas recientes:
 ${artistasRecientes.length ? artistasRecientes.map(a => `- ${a}`).join('\n') : '- Ninguno'}
 
-Responde ÚNICAMENTE con JSON válido. No incluyas texto antes ni después. No uses markdown.
+Responde ÚNICAMENTE con JSON válido. No incluyas texto antes ni después. No uses markdown. No uses bloques \`\`\`.
 
 Devuelve SOLO JSON válido con esta estructura EXACTA:
 
@@ -117,7 +117,7 @@ Devuelve SOLO JSON válido con esta estructura EXACTA:
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
-        max_tokens: 1500,
+        max_tokens: 1800,
         messages: [
           { role: 'user', content: prompt }
         ]
@@ -131,36 +131,42 @@ Devuelve SOLO JSON válido con esta estructura EXACTA:
       return res.status(500).json(anthropicJson);
     }
 
-  const text = anthropicJson.content?.map(block => block.text || '').join('') || '';
+    const text = anthropicJson.content?.map(block => block.text || '').join('') || '';
 
-const cleanText = text
-  .replace(/```json/gi, '')
-  .replace(/```/g, '')
-  .trim();
+    const cleanText = text
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
 
-// intenta encontrar el primer objeto JSON completo
-const firstBrace = cleanText.indexOf('{');
-const lastBrace = cleanText.lastIndexOf('}');
+    const firstBrace = cleanText.indexOf('{');
+    const lastBrace = cleanText.lastIndexOf('}');
 
-const jsonCandidate =
-  firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace
-    ? cleanText.slice(firstBrace, lastBrace + 1)
-    : cleanText;
+    const jsonCandidate =
+      firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace
+        ? cleanText.slice(firstBrace, lastBrace + 1)
+        : cleanText;
 
-let parsed;
-try {
-  parsed = JSON.parse(jsonCandidate);
-} catch (e) {
-  console.error('JSON parse error RAW:', text);
-  console.error('JSON parse error CLEAN:', cleanText);
-  console.error('JSON parse error CANDIDATE:', jsonCandidate);
-  return res.status(500).json({
-    error: 'Anthropic no devolvió JSON válido',
-    raw: text,
-    cleanText,
-    jsonCandidate
-  });
-}
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonCandidate);
+    } catch (e) {
+      console.error('JSON parse error RAW:', text);
+      console.error('JSON parse error CLEAN:', cleanText);
+      console.error('JSON parse error CANDIDATE:', jsonCandidate);
+      return res.status(500).json({
+        error: 'Anthropic no devolvió JSON válido',
+        raw: text,
+        cleanText,
+        jsonCandidate
+      });
+    }
+
+    if (!parsed.playlistName || !parsed.description || !Array.isArray(parsed.songs)) {
+      return res.status(500).json({
+        error: 'Anthropic devolvió JSON incompleto',
+        parsed
+      });
+    }
 
     return res.status(200).json({
       ...parsed,

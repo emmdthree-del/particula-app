@@ -169,10 +169,11 @@ Devuelve SOLO JSON válido con esta estructura EXACTA:
    const text = anthropicJson.content
   ?.map(block => block.text || '')
   .join('') || '';
+  const cleanText = text.replace(/```json|```/g, '').trim();
 
     let parsed;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(cleanText);
     } catch (e) {
       console.error('JSON parse error:', text);
       return res.status(500).json({ error: 'Anthropic no devolvió JSON válido', raw: text });

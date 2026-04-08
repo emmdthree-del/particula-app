@@ -130,7 +130,9 @@ REGLAS:
 - No repitas artistas
 - Devuelve canciones reales
 
-Devuelve SOLO JSON válido con esta estructura:
+Responde ÚNICAMENTE con JSON válido. No incluyas texto antes ni después.
+
+Devuelve SOLO JSON válido con esta estructura EXACTA:
 
 {
   "playlistName": "",
@@ -164,7 +166,9 @@ Devuelve SOLO JSON válido con esta estructura:
       return res.status(500).json({ error: 'Error en Anthropic', details: anthropicJson });
     }
 
-   const text = anthropicJson.content?.[0]?.text || '';
+   const text = anthropicJson.content
+  ?.map(block => block.text || '')
+  .join('') || '';
 
     let parsed;
     try {

@@ -104,45 +104,73 @@ Devuelve únicamente JSON válido, sin markdown, sin explicación, con esta estr
 
    try {
 
-    // 👇 PEGA AQUÍ EL BLOQUE DEMO
+     const prompt = `
+Eres un curador musical experto en identidad sonora para negocios.
 
-    const mood = (contexto.mood || '').toLowerCase();
-    const horario = (contexto.horario || '').toLowerCase();
-    const climaMood = climaTexto.toLowerCase();
+Crea una playlist con estas condiciones:
 
-    let songs = [
-      { title: 'Midnight City', artist: 'M83', genre: 'synth-pop nocturno' },
-      { title: 'Teardrop', artist: 'Massive Attack', genre: 'trip-hop atmosférico' },
-      { title: 'Weightless', artist: 'Marconi Union', genre: 'ambient terapéutico' },
-      { title: 'Awake', artist: 'Tycho', genre: 'downtempo instrumental' },
-      { title: 'Sunset Lover', artist: 'Petit Biscuit', genre: 'electrónica chill' },
-      { title: 'Tadow', artist: 'Masego & FKJ', genre: 'nu-jazz sensual' },
-      { title: 'Night Owl', artist: 'Galimatias', genre: 'future soul' },
-      { title: 'Coffee', artist: 'Miguel', genre: 'r&b suave' }
-    ];
+NEGOCIO:
+${JSON.stringify(perfil)}
 
-    if (mood.includes('energía')) {
-      songs = [
-        { title: 'Back on 74', artist: 'Jungle', genre: 'funk contemporáneo' },
-        { title: 'Electric Feel', artist: 'MGMT', genre: 'indie electrónico' },
-        { title: 'Walking On A Dream', artist: 'Empire of the Sun', genre: 'synth-pop' },
-        { title: '1901', artist: 'Phoenix', genre: 'indie francés' }
-      ];
+CONTEXTO:
+- Horario: ${contexto.horario}
+- Mood: ${contexto.mood}
+- Duración: ${contexto.dur} horas
+- ${climaTexto}
+
+REGLAS:
+- Evita música comercial o muy conocida
+- Mezcla géneros, países y épocas
+- Mantén coherencia con el negocio
+- No repitas artistas
+- Devuelve canciones reales
+
+Devuelve SOLO JSON válido con esta estructura:
+
+{
+  "playlistName": "",
+  "description": "",
+  "songs": [
+    { "title": "", "artist": "", "genre": "" }
+  ]
+}
+`.trim();
+
+    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 1500,
+        messages: [
+          { role: 'user', content: prompt }
+        ]
+      })
+    });
+
+    const anthropicJson = await anthropicRes.json();
+
+    if (!anthropicRes.ok) {
+      console.error('Anthropic error:', anthropicJson);
+      return res.status(500).json({ error: 'Error en Anthropic', details: anthropicJson });
     }
 
-    if (climaMood.includes('lluvioso') || climaMood.includes('frío')) {
-      songs = [
-        { title: 'Teardrop', artist: 'Massive Attack', genre: 'trip-hop atmosférico' },
-        { title: 'Holocene', artist: 'Bon Iver', genre: 'folk atmosférico' },
-        { title: 'Mystery of Love', artist: 'Sufjan Stevens', genre: 'folk íntimo' },
-        { title: 'Porcelain', artist: 'Moby', genre: 'electrónica nostálgica' }
-      ];
+    const text = anthropicJson.content?.map(x => x.text || '').join('') || '';
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      console.error('JSON parse error:', text);
+      return res.status(500).json({ error: 'Anthropic no devolvió JSON válido', raw: text });
     }
 
     return res.status(200).json({
-      playlistName: `Selección demo para ${perfil.nombre || 'tu lugar'}`,
-      description: `Playlist demo curada según el momento y el contexto.`,
-      songs,
+      ...parsed,
       clima: climaData
     });
 

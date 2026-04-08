@@ -161,10 +161,10 @@ Devuelve SOLO JSON válido con esta estructura EXACTA:
 
     const anthropicJson = await anthropicRes.json();
 
-    if (!anthropicRes.ok) {
-      console.error('Anthropic error:', anthropicJson);
-      return res.status(500).json({ error: 'Error en Anthropic', details: anthropicJson });
-    }
+  if (!anthropicRes.ok) {
+  console.error('Anthropic error FULL:', anthropicJson);
+  return res.status(500).json(anthropicJson);
+}
 
    const text = anthropicJson.content
   ?.map(block => block.text || '')

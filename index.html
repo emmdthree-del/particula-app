@@ -377,7 +377,7 @@
           <option value="2">2 horas (~30 canciones)</option>
           <option value="4" selected>4 horas (~60 canciones)</option>
           <option value="6">6 horas (~90 canciones)</option>
-          <option value="8">8 horas (~120 canciones)</option>
+          <option value="8">8 horas (~100 canciones)</option>
         </select>
       </div>
       <div class="field"><label>Clima actual</label>
@@ -415,21 +415,12 @@
       <div class="pl-desc" id="pl-desc">—</div>
       <div class="pl-meta"><span class="pl-meta-item" id="pl-m1">—</span><span class="pl-meta-item" id="pl-m2">—</span><span class="pl-meta-item" id="pl-m3">—</span></div>
     </div>
-    <div id="player-wrap" class="player-card">
-      <div class="np-label">reproduciendo ahora</div>
-      <div class="np-titulo" id="np-tit">—</div>
-      <div class="np-artista" id="np-art">—</div>
-      <div class="progress-bar" onclick="seekP(event)"><div class="progress-fill" id="prog-fill"></div></div>
-      <div class="progress-times"><span id="prog-cur">0:00</span><span id="prog-tot">0:00</span></div>
-      <div class="player-controls">
-        <button class="btn-ctrl" onclick="prevT()">⏮</button>
-        <button class="btn-ctrl btn-play-main" id="btn-pp" onclick="togPlay()">▶</button>
-        <button class="btn-ctrl" onclick="nextT()">⏭</button>
-      </div>
-    </div>
-    <div id="spotify-err" class="spotify-err-msg" style="display:none">
-      Conecta Spotify Premium para reproducir aquí.<br>
-      <button onclick="connectSpotify()" style="margin-top:0.75rem;padding:0.5rem 1rem;background:var(--acento);color:#0d0d0d;border:none;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.8rem;font-weight:500">Conectar Spotify</button>
+    <div id="spotify-card" class="player-card">
+      <div class="np-label">spotify</div>
+      <div class="np-titulo" id="spotify-status-title">Playlist lista para crear</div>
+      <div class="np-artista" id="spotify-status-desc">Particula validara las canciones y creara una playlist privada en tu cuenta de Spotify.</div>
+      <button id="btn-create-spotify" class="btn-spotify" onclick="createCurrentPlaylistOnSpotify()">Crear en Spotify</button>
+      <button id="btn-open-spotify" class="btn-spotify" onclick="openSpotifyPlaylist()" style="display:none">Abrir en Spotify</button>
     </div>
     <div style="display:flex;gap:0.75rem;margin:1rem 0">
       <button class="btn-secondary" style="flex:1" onclick="savePlaylist()">💾 Guardar</button>
@@ -446,7 +437,7 @@
   <div class="main">
     <span class="tag">mis playlists</span>
     <div class="titulo">Guardadas</div>
-    <div class="subtitulo" style="margin-bottom:1.5rem">Tus playlists curadas listas para reproducir.</div>
+    <div class="subtitulo" style="margin-bottom:1.5rem">Tus playlists curadas listas para abrir en Spotify.</div>
     <div id="saved-wrap"></div>
   </div>
   <div class="bottom-nav">
@@ -464,7 +455,7 @@
 
 <script>
 const CLIENT_ID='eac6203085c54d429dbef07f1f236734';
-const SCOPES='streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state';
+const SCOPES='user-read-email user-read-private playlist-modify-private';
 const LMSGS=['Analizando el perfil del negocio...','Entendiendo a tu cliente...','Buscando la energía adecuada...','Construyendo la secuencia perfecta...','Afinando el mood del momento...','Último toque de criterio...'];
 const TOKEN_KEY='ptk';
 const REFRESH_KEY='prtk';
@@ -716,13 +707,26 @@ function afterLogin(){
   S.perfil=JSON.parse(localStorage.getItem(`pperfil_${S.user?.email||'sp'}`)||'null');
   S.lastClima=localStorage.getItem('plclima');
   buildSteps();
-  if(S.token)initPlayer();
+
+  const pending=JSON.parse(localStorage.getItem('p_pending_spotify_playlist')||'null');
+  if(pending&&S.token){
+    localStorage.removeItem('p_pending_spotify_playlist');
+    S.current=pending;
+    renderPl(S.current);
+    showScr('playlist');
+    setTimeout(()=>createCurrentPlaylistOnSpotify(),100);
+    return;
+  }
+
   if(S.perfil){showScr('home');initHome();}else{showScr('onboarding');}
 }
 
 function logout(){
   sessionStorage.removeItem('p_user');
-  S.user=null;S.perfil=null;S.player=null;S.playerReady=false;S.current=null;
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_KEY);
+  sessionStorage.removeItem(EXP_KEY);
+  S.user=null;S.perfil=null;S.token=null;S.refreshToken=null;S.tokenExpiresAt=null;S.current=null;
   showScr('login');
 }
 
@@ -769,50 +773,194 @@ async function exchangeCodeForToken(code){
   sessionStorage.removeItem(PKCE_KEY);
 }
 
-function initPlayer(){
-  if(!S.token)return;
-  window.onSpotifyWebPlaybackSDKReady=()=>{
-    const p=new Spotify.Player({name:'Partícula',getOAuthToken:async cb=>{await ensureValidSpotifyToken();cb(S.token);},volume:0.8});
-    p.addListener('ready',({device_id})=>{S.deviceId=device_id;S.playerReady=true;document.getElementById('player-wrap').style.display='block';document.getElementById('spotify-err').style.display='none';});
-    p.addListener('not_ready',()=>{S.playerReady=false;});
-    p.addListener('player_state_changed',st=>{if(st)updatePUI(st);});
-    p.addListener('authentication_error',({message})=>{console.error(message);S.playerReady=false;document.getElementById('spotify-err').style.display='block';});
-    p.connect();S.player=p;
-  };
-  if(window.Spotify && !S.player){window.onSpotifyWebPlaybackSDKReady();return;}
-  if(!document.getElementById('spk')){const sc=document.createElement('script');sc.id='spk';sc.src='https://sdk.scdn.co/spotify-player.js';document.head.appendChild(sc);}
-}
+async function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 
-async function playSpotify(idx){
-  if(!S.current)return;
+async function spotifyApiFetch(url,options={},retryCount=0){
   const ok=await ensureValidSpotifyToken();
-  if(!ok||!S.playerReady||!S.deviceId)return;
-  const song=S.current.songs[idx];
+  if(!ok)throw new Error('SPOTIFY_AUTH_REQUIRED');
+
+  const headers={...(options.headers||{}),'Authorization':'Bearer '+S.token};
+  let res=await fetch(url,{...options,headers});
+
+  if(res.status===401&&retryCount<1&&S.refreshToken){
+    S.tokenExpiresAt=0;
+    const refreshed=await ensureValidSpotifyToken();
+    if(refreshed)return spotifyApiFetch(url,options,retryCount+1);
+  }
+
+  if(res.status===429&&retryCount<2){
+    const waitSeconds=Math.min(Number(res.headers.get('Retry-After')||2),10);
+    await sleep(waitSeconds*1000);
+    return spotifyApiFetch(url,options,retryCount+1);
+  }
+
+  return res;
+}
+
+function setSpotifyStatus(title,desc,mode='create'){
+  const titleEl=document.getElementById('spotify-status-title');
+  const descEl=document.getElementById('spotify-status-desc');
+  const createBtn=document.getElementById('btn-create-spotify');
+  const openBtn=document.getElementById('btn-open-spotify');
+  if(titleEl)titleEl.textContent=title;
+  if(descEl)descEl.textContent=desc;
+  if(createBtn)createBtn.style.display=mode==='create'?'flex':'none';
+  if(openBtn)openBtn.style.display=mode==='open'?'flex':'none';
+}
+
+function scoreSpotifyTrack(candidate,song){
+  const targetTitle=normalizeText(song.title).replace(/\([^)]*\)|\[[^\]]*\]/g,'').trim();
+  const candidateTitle=normalizeText(candidate.name).replace(/\([^)]*\)|\[[^\]]*\]/g,'').trim();
+  const targetArtist=normalizeText(song.artist).split(/,|&| feat\.? | ft\.? /)[0].trim();
+  const candidateArtists=(candidate.artists||[]).map(a=>normalizeText(a.name));
+  let score=0;
+  if(candidateTitle===targetTitle)score+=8;
+  else if(candidateTitle.includes(targetTitle)||targetTitle.includes(candidateTitle))score+=4;
+  if(candidateArtists.some(a=>a===targetArtist))score+=8;
+  else if(candidateArtists.some(a=>a.includes(targetArtist)||targetArtist.includes(a)))score+=4;
+  if(/remix|live|karaoke|tribute/.test(candidateTitle)&&!/remix|live/.test(targetTitle))score-=4;
+  return score;
+}
+
+async function searchSpotifyTrack(song){
+  const queries=[
+    `track:${song.title} artist:${song.artist}`,
+    `${song.title} ${song.artist}`
+  ];
+
+  for(const q of queries){
+    const res=await spotifyApiFetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=5`);
+    const raw=await res.text();
+    if(res.status===403)throw new Error('SPOTIFY_ACCESS_DENIED');
+    if(!res.ok)continue;
+    let data;
+    try{data=JSON.parse(raw);}catch{continue;}
+    const items=data.tracks?.items||[];
+    if(!items.length)continue;
+    const ranked=[...items].sort((a,b)=>scoreSpotifyTrack(b,song)-scoreSpotifyTrack(a,song));
+    if(scoreSpotifyTrack(ranked[0],song)>=8)return ranked[0];
+  }
+  return null;
+}
+
+async function mapWithConcurrency(items,limit,fn,onProgress){
+  const results=new Array(items.length);
+  let nextIndex=0;
+  let completed=0;
+  async function worker(){
+    while(true){
+      const i=nextIndex++;
+      if(i>=items.length)return;
+      results[i]=await fn(items[i],i);
+      completed++;
+      if(onProgress)onProgress(completed,items.length);
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(limit,items.length)},()=>worker()));
+  return results;
+}
+
+async function createCurrentPlaylistOnSpotify(){
+  if(!S.current||!Array.isArray(S.current.songs)||!S.current.songs.length)return;
+
+  if(!S.token){
+    localStorage.setItem('p_pending_spotify_playlist',JSON.stringify(S.current));
+    connectSpotify();
+    return;
+  }
+
+  const createBtn=document.getElementById('btn-create-spotify');
+  if(createBtn)createBtn.disabled=true;
+
   try{
-    const q=`track:${song.title} artist:${song.artist}`;
-    const r=await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=1`,{headers:{'Authorization':'Bearer '+S.token}});
-    const d=await r.json();const tr=d.tracks?.items?.[0];if(!tr)return;
-    await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(S.deviceId)}`,{method:'PUT',headers:{'Authorization':'Bearer '+S.token,'Content-Type':'application/json'},body:JSON.stringify({uris:[tr.uri]})});
-  }catch(e){console.error(e);}
+    setSpotifyStatus('Validando canciones en Spotify...','0 de '+S.current.songs.length+' canciones revisadas.','none');
+
+    const matches=await mapWithConcurrency(
+      S.current.songs.slice(0,100),
+      4,
+      async song=>{
+        try{return await searchSpotifyTrack(song);}catch(err){
+          if(err.message==='SPOTIFY_ACCESS_DENIED'||err.message==='SPOTIFY_AUTH_REQUIRED')throw err;
+          console.warn('No se pudo validar',song,err);
+          return null;
+        }
+      },
+      (done,total)=>setSpotifyStatus('Validando canciones en Spotify...',`${done} de ${total} canciones revisadas.`,'none')
+    );
+
+    const uris=[];
+    const resolvedSongs=[];
+    const missingSongs=[];
+    matches.forEach((track,i)=>{
+      if(track&&!uris.includes(track.uri)){
+        uris.push(track.uri);
+        resolvedSongs.push({...S.current.songs[i],spotifyUri:track.uri,spotifyName:track.name});
+      }else{
+        missingSongs.push(S.current.songs[i]);
+      }
+    });
+
+    if(!uris.length)throw new Error('NO_SPOTIFY_TRACKS_FOUND');
+
+    setSpotifyStatus('Creando playlist en Spotify...',`${uris.length} canciones listas para agregar.`,'none');
+
+    const createRes=await spotifyApiFetch('https://api.spotify.com/v1/me/playlists',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        name:`Particula - ${S.current.playlistName}`,
+        description:`Curada por Particula para ${S.current.negocio}. ${S.current.horario}. ${S.current.mood}.`,
+        public:false
+      })
+    });
+
+    const createRaw=await createRes.text();
+    if(createRes.status===403)throw new Error('SPOTIFY_SCOPE_REQUIRED');
+    if(!createRes.ok)throw new Error('SPOTIFY_CREATE_FAILED: '+createRaw);
+    const spotifyPlaylist=JSON.parse(createRaw);
+
+    const addRes=await spotifyApiFetch(`https://api.spotify.com/v1/playlists/${encodeURIComponent(spotifyPlaylist.id)}/items`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({uris:uris.slice(0,100)})
+    });
+    const addRaw=await addRes.text();
+    if(!addRes.ok)throw new Error('SPOTIFY_ADD_FAILED: '+addRaw);
+
+    S.current.spotifyUrl=spotifyPlaylist.external_urls?.spotify||`https://open.spotify.com/playlist/${spotifyPlaylist.id}`;
+    S.current.spotifyPlaylistId=spotifyPlaylist.id;
+    S.current.spotifyMatched=uris.length;
+    S.current.spotifyMissing=missingSongs;
+    S.current.spotifyResolvedSongs=resolvedSongs;
+
+    const key=`psaved_${S.user?.email||'sp'}`;
+    const savedIndex=S.saved.findIndex(p=>p.id===S.current.id);
+    if(savedIndex>=0){
+      S.saved[savedIndex]=S.current;
+      localStorage.setItem(key,JSON.stringify(S.saved));
+    }
+
+    const extra=missingSongs.length?` No se encontraron ${missingSongs.length} y no se agregaron.`:'';
+    setSpotifyStatus('Playlist creada en Spotify',`${uris.length} canciones agregadas.${extra}`,'open');
+  }catch(err){
+    console.error(err);
+    if(err.message==='SPOTIFY_SCOPE_REQUIRED'||err.message==='SPOTIFY_ACCESS_DENIED'){
+      setSpotifyStatus('Spotify necesita autorizacion','Vuelve a conectar tu cuenta para dar permiso de crear playlists privadas.','create');
+      localStorage.setItem('p_pending_spotify_playlist',JSON.stringify(S.current));
+      if(confirm('Spotify necesita un permiso nuevo para crear playlists. Quieres reconectar tu cuenta ahora?'))connectSpotify();
+    }else if(err.message==='SPOTIFY_AUTH_REQUIRED'){
+      setSpotifyStatus('Conecta Spotify','Necesitamos tu cuenta de Spotify para crear la playlist.','create');
+    }else{
+      setSpotifyStatus('No se pudo crear en Spotify','La seleccion de Particula sigue guardada. Puedes intentar de nuevo.','create');
+    }
+  }finally{
+    if(createBtn)createBtn.disabled=false;
+  }
 }
 
-function updatePUI(st){
-  if(!st||!st.track_window?.current_track)return;
-  const tr=st.track_window.current_track;
-  document.getElementById('np-tit').textContent=tr.name;
-  document.getElementById('np-art').textContent=tr.artists.map(a=>a.name).join(', ');
-  document.getElementById('btn-pp').textContent=st.paused?'▶':'⏸';
-  const pct=st.duration?(st.position/st.duration*100):0;
-  document.getElementById('prog-fill').style.width=pct+'%';
-  document.getElementById('prog-cur').textContent=fmtT(st.position);
-  document.getElementById('prog-tot').textContent=fmtT(st.duration);
+function openSpotifyPlaylist(){
+  if(S.current?.spotifyUrl)window.open(S.current.spotifyUrl,'_blank','noopener,noreferrer');
 }
-
-function fmtT(ms){const s=Math.floor(ms/1000);return`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
-async function togPlay(){if(S.player)await S.player.togglePlay();}
-async function nextT(){if(S.player&&S.playerReady){await S.player.nextTrack();}else{S.songIdx=Math.min(S.songIdx+1,(S.current?.songs.length||1)-1);hlSong(S.songIdx);}}
-async function prevT(){if(S.player&&S.playerReady){await S.player.previousTrack();}else{S.songIdx=Math.max(S.songIdx-1,0);hlSong(S.songIdx);}}
-function seekP(e){if(!S.player)return;const r=e.offsetX/e.currentTarget.offsetWidth;S.player.getCurrentState().then(st=>{if(st)S.player.seek(st.duration*r);});}
 
 // CHIPS & AGE
 function chip(g,el,v){
@@ -958,7 +1106,7 @@ function curateSongs(targetCount){
 async function generar(){
   const p = S.perfil;
   const dur = parseInt(document.getElementById('h-dur').value, 10);
-  const sc = dur * 15;
+  const sc = Math.min(dur * 15, 100);
 
   showLoad(true);
 
@@ -1039,6 +1187,7 @@ async function generar(){
 
     renderPl(S.current);
     showScr('playlist');
+    if(S.token)setTimeout(()=>createCurrentPlaylistOnSpotify(),100);
   } catch (e) {
     console.error(e);
     showLoad(false);
@@ -1047,22 +1196,29 @@ async function generar(){
 }
 
 function renderPl(pl){
-  const em={soleado:'☀️',nublado:'⛅',lluvioso:'🌧️',frío:'🌬️',caluroso:'🌡️'};
-  document.getElementById('pl-ctag').textContent=`partícula · ${pl.fecha} · ${em[pl.clima]||''} ${pl.clima}`;
+  const em={soleado:'\u2600\ufe0f',nublado:'\u26c5',lluvioso:'\ud83c\udf27\ufe0f',frio:'\ud83c\udf2c\ufe0f',caluroso:'\ud83c\udf21\ufe0f','fr\u00edo':'\ud83c\udf2c\ufe0f'};
+  document.getElementById('pl-ctag').textContent=`particula - ${pl.fecha} - ${em[pl.clima]||''} ${pl.clima}`;
   document.getElementById('pl-nombre').textContent=`"${pl.playlistName}"`;
   document.getElementById('pl-desc').textContent=pl.description;
   document.getElementById('pl-m1').textContent=pl.negocio;
   document.getElementById('pl-m2').textContent=pl.horario;
-  document.getElementById('pl-m3').textContent=`${pl.songs.length} canciones · ${pl.dur}h`;
+  document.getElementById('pl-m3').textContent=`${pl.songs.length} canciones - ${pl.dur}h`;
   document.getElementById('pl-count').textContent=pl.songs.length;
-  if(pl.songs.length>0){document.getElementById('np-tit').textContent=pl.songs[0].title;document.getElementById('np-art').textContent=pl.songs[0].artist;}
-  document.getElementById('player-wrap').style.display=S.playerReady?'block':'none';
-  document.getElementById('spotify-err').style.display=S.playerReady?'none':'block';
-  if(S.playerReady)playSpotify(0);
-  document.getElementById('pl-songs').innerHTML=pl.songs.map((s,i)=>`<div class="song-item ${i===0?'playing':''}" onclick="playSong(${i})"><span class="song-num">${String(i+1).padStart(2,'0')}</span><div><div class="song-titulo">${s.title}</div><div class="song-artista">${s.artist}</div></div><span class="song-genero">${s.genre}</span></div>`).join('');
+
+  if(pl.spotifyUrl){
+    const missing=Array.isArray(pl.spotifyMissing)?pl.spotifyMissing.length:0;
+    const matched=pl.spotifyMatched||pl.songs.length-missing;
+    setSpotifyStatus('Playlist creada en Spotify',`${matched} canciones agregadas.${missing?` No se encontraron ${missing}.`:''}`,'open');
+  }else if(S.token){
+    setSpotifyStatus('Playlist lista para crear','Particula validara las canciones y creara una playlist privada en tu cuenta de Spotify.','create');
+  }else{
+    setSpotifyStatus('Conecta Spotify','Conecta tu cuenta para crear esta playlist directamente en Spotify.','create');
+    const btn=document.getElementById('btn-create-spotify');
+    if(btn)btn.textContent='Conectar Spotify y crear';
+  }
+
+  document.getElementById('pl-songs').innerHTML=pl.songs.map((song,i)=>`<div class="song-item"><span class="song-num">${String(i+1).padStart(2,'0')}</span><div><div class="song-titulo">${song.title}</div><div class="song-artista">${song.artist}</div></div><span class="song-genero">${song.genre||''}</span></div>`).join('');
 }
-function playSong(i){S.songIdx=i;hlSong(i);if(S.playerReady)playSpotify(i);else{const s=S.current.songs[i];document.getElementById('np-tit').textContent=s.title;document.getElementById('np-art').textContent=s.artist;}}
-function hlSong(i){document.querySelectorAll('.song-item').forEach((el,j)=>el.classList.toggle('playing',j===i));}
 
 // SAVED
 function savePlaylist(){

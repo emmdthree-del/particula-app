@@ -130,9 +130,42 @@ async function callAnthropic(prompt) {
   }
 }
 
-function buildFreshnessPlan(totalSongs) {
+function buildFreshnessPlan(totalSongs, contexto = {}) {
   const currentYear = new Date().getFullYear();
   const previousYear = currentYear - 1;
+
+  const requestedTargets = contexto?.freshnessTargets || null;
+
+  if (requestedTargets) {
+    const targetCurrent = clamp(
+      Math.round(Number(requestedTargets.current) || 0),
+      0,
+      totalSongs
+    );
+
+    const targetPrevious = clamp(
+      Math.round(Number(requestedTargets.previous) || 0),
+      0,
+      totalSongs - targetCurrent
+    );
+
+    const targetOlder = clamp(
+      Math.round(Number(requestedTargets.older) || 0),
+      0,
+      totalSongs - targetCurrent - targetPrevious
+    );
+
+    const assigned = targetCurrent + targetPrevious + targetOlder;
+    const remainder = Math.max(0, totalSongs - assigned);
+
+    return {
+      currentYear,
+      previousYear,
+      targetCurrent,
+      targetPrevious,
+      targetOlder: targetOlder + remainder
+    };
+  }
 
   let targetCurrent = Math.round(totalSongs * CURRENT_YEAR_SHARE);
   let targetPrevious = Math.round(totalSongs * PREVIOUS_YEAR_SHARE);
@@ -350,6 +383,7 @@ CONTEXTO DEL MOMENTO:
 - ${climaTexto}
 
 GENERA EXACTAMENTE ${count} CANCIONES NUEVAS PARA ESTE BLOQUE.
+${contexto.replacementMode ? '- Este bloque es de REEMPLAZO: no reutilices canciones ya propuestas y prioriza canciones fáciles de identificar exactamente en Spotify.' : ''}
 
 CUOTAS OBLIGATORIAS DE ACTUALIDAD PARA ESTE BLOQUE:
 - ${batchTargets.current} canciones cuyo PRIMER lanzamiento comercial de ESTA GRABACIÓN O VERSIÓN haya sido en ${freshnessPlan.currentYear}.
@@ -388,6 +422,7 @@ REGLAS EDITORIALES OBLIGATORIAS:
 11. Evita repetir artistas siempre que sea posible. En playlists largas, un artista puede aparecer máximo 2 veces y nunca de forma cercana.
 12. No inventes canciones ni artistas.
 13. Usa solo canciones reales y plausibles de encontrar en Spotify.
+13A. Evita títulos ambiguos, aliases dudosos, bootlegs, edits no oficiales, uploads informales o canciones cuya existencia en Spotify no puedas sostener con alta confianza.
 14. Respeta estrictamente lo que el negocio indicó que NO quiere.
 15. Si dudas entre una canción famosa y una mejor curada, elige la mejor curada.
 16. Evita karaoke, tribute, covers genéricos, live versions o regrabaciones salvo que sean editorialmente necesarias.
@@ -499,7 +534,7 @@ export default async function handler(req, res) {
       MAX_SONGS
     );
 
-    const freshnessPlan = buildFreshnessPlan(totalSongs);
+    const freshnessPlan = buildFreshnessPlan(totalSongs, contexto);
 
     let allSongs = [];
     let playlistName = '';

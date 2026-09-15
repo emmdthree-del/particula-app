@@ -2,8 +2,10 @@ const MODEL = 'claude-sonnet-4-5';
 const MAX_SONGS = 100;
 const BATCH_SIZE = 35;
 
-// Objetivo editorial de actualidad.
-// No convierte la playlist en una lista de novedades: mantiene 55% para catalogo anterior.
+// Mezcla editorial objetivo:
+// 25% lanzamientos del año actual
+// 20% lanzamientos del año anterior
+// 55% catálogo anterior
 const CURRENT_YEAR_SHARE = 0.25;
 const PREVIOUS_YEAR_SHARE = 0.20;
 
@@ -22,29 +24,43 @@ function normalize(value) {
 
 function normalizeYear(value) {
   const year = Number.parseInt(value, 10);
-  if (!Number.isInteger(year) || year < 1900 || year > new Date().getFullYear()) {
+  const currentYear = new Date().getFullYear();
+
+  if (!Number.isInteger(year) || year < 1900 || year > currentYear) {
     return null;
   }
+
   return year;
+}
+
+function songKey(song) {
+  return `${normalize(song?.title)}|||${normalize(song?.artist)}`;
+}
+
+function cleanSong(song) {
+  if (!song || !song.title || !song.artist) return null;
+
+  return {
+    title: String(song.title).trim(),
+    artist: String(song.artist).trim(),
+    genre: String(song.genre || '').trim(),
+    year: normalizeYear(song.year)
+  };
 }
 
 function uniqueSongs(songs) {
   const seen = new Set();
   const result = [];
 
-  for (const song of songs || []) {
-    if (!song || !song.title || !song.artist) continue;
+  for (const rawSong of songs || []) {
+    const song = cleanSong(rawSong);
+    if (!song) continue;
 
-    const key = `${normalize(song.title)}|||${normalize(song.artist)}`;
+    const key = songKey(song);
     if (seen.has(key)) continue;
-    seen.add(key);
 
-    result.push({
-      title: String(song.title).trim(),
-      artist: String(song.artist).trim(),
-      genre: String(song.genre || '').trim(),
-      year: normalizeYear(song.year)
-    });
+    seen.add(key);
+    result.push(song);
   }
 
   return result;
@@ -77,7 +93,12 @@ async function callAnthropic(prompt) {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 7000,
-      messages: [{ role: 'user', content: prompt }]
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
     })
   });
 
@@ -85,10 +106,13 @@ async function callAnthropic(prompt) {
 
   if (!anthropicRes.ok) {
     console.error('Anthropic error:', anthropicJson);
-    throw new Error(anthropicJson?.error?.message || 'Anthropic API error');
+    throw new Error(
+      anthropicJson?.error?.message || 'Anthropic API error'
+    );
   }
 
-  const text = anthropicJson.content?.map(block => block.text || '').join('') || '';
+  const text =
+    anthropicJson.content?.map(block => block.text || '').join('') || '';
 
   if (anthropicJson.stop_reason === 'max_tokens') {
     console.error('Anthropic response truncated:', text);
@@ -110,75 +134,117 @@ function buildFreshnessPlan(totalSongs) {
   const currentYear = new Date().getFullYear();
   const previousYear = currentYear - 1;
 
-  let current = Math.round(totalSongs * CURRENT_YEAR_SHARE);
-  let previous = Math.round(totalSongs * PREVIOUS_YEAR_SHARE);
+  let targetCurrent = Math.round(totalSongs * CURRENT_YEAR_SHARE);
+  let targetPrevious = Math.round(totalSongs * PREVIOUS_YEAR_SHARE);
 
-  // Para playlists cortas queremos al menos algunas canciones realmente actuales.
-  if (totalSongs >= 10) current = Math.max(current, 3);
-  if (totalSongs >= 10) previous = Math.max(previous, 2);
-
-  if (current + previous > totalSongs) {
-    previous = Math.max(0, totalSongs - current);
+  // En playlists cortas forzamos presencia visible de música reciente.
+  if (totalSongs >= 10) {
+    targetCurrent = Math.max(targetCurrent, 3);
+    targetPrevious = Math.max(targetPrevious, 2);
   }
+
+  if (targetCurrent + targetPrevious > totalSongs) {
+    targetPrevious = Math.max(0, totalSongs - targetCurrent);
+  }
+
+  const targetOlder = totalSongs - targetCurrent - targetPrevious;
 
   return {
     currentYear,
     previousYear,
-    targetCurrent: current,
-    targetPrevious: previous,
-    targetOlder: totalSongs - current - previous
+    targetCurrent,
+    targetPrevious,
+    targetOlder
   };
 }
 
-function countFreshness(songs, plan) {
-  let current = 0;
-  let previous = 0;
-  let older = 0;
-  let unknown = 0;
-
-  for (const song of songs) {
-    if (song.year === plan.currentYear) current += 1;
-    else if (song.year === plan.previousYear) previous += 1;
-    else if (song.year && song.year < plan.previousYear) older += 1;
-    else unknown += 1;
-  }
-
-  return { current, previous, older, unknown };
+function classifySongYear(song, plan) {
+  if (!song?.year) return 'unknown';
+  if (song.year === plan.currentYear) return 'current';
+  if (song.year === plan.previousYear) return 'previous';
+  if (song.year < plan.previousYear) return 'older';
+  return 'unknown';
 }
 
-function allocateBatchTargets({ totalSongs, batchCount, allSongs, plan }) {
-  const counts = countFreshness(allSongs, plan);
-  const remainingTotal = Math.max(1, totalSongs - allSongs.length);
+function countFreshness(songs, plan) {
+  const counts = {
+    current: 0,
+    previous: 0,
+    older: 0,
+    unknown: 0
+  };
 
-  const remainingCurrent = Math.max(0, plan.targetCurrent - counts.current);
-  const remainingPrevious = Math.max(0, plan.targetPrevious - counts.previous);
-  const remainingOlder = Math.max(0, plan.targetOlder - counts.older);
+  for (const song of songs || []) {
+    const bucket = classifySongYear(song, plan);
+    counts[bucket] += 1;
+  }
+
+  return counts;
+}
+
+function getFreshnessDeficits(songs, plan) {
+  const counts = countFreshness(songs, plan);
+
+  return {
+    current: Math.max(0, plan.targetCurrent - counts.current),
+    previous: Math.max(0, plan.targetPrevious - counts.previous),
+    older: Math.max(0, plan.targetOlder - counts.older)
+  };
+}
+
+function allocateBatchTargets(deficits, batchCount) {
+  const remainingTotal =
+    deficits.current + deficits.previous + deficits.older;
+
+  if (remainingTotal <= 0) {
+    return { current: 0, previous: 0, older: 0 };
+  }
 
   let current = Math.min(
-    remainingCurrent,
-    Math.round(batchCount * (remainingCurrent / remainingTotal))
+    deficits.current,
+    Math.round(batchCount * (deficits.current / remainingTotal))
   );
 
   let previous = Math.min(
-    remainingPrevious,
-    Math.round(batchCount * (remainingPrevious / remainingTotal))
+    deficits.previous,
+    Math.round(batchCount * (deficits.previous / remainingTotal))
   );
 
-  // Garantiza que un bloque no ignore por completo un deficit importante.
-  if (remainingCurrent > 0 && current === 0) current = 1;
-  if (remainingPrevious > 0 && previous === 0 && current < batchCount) previous = 1;
+  let older = Math.min(
+    deficits.older,
+    batchCount - current - previous
+  );
 
-  let older = batchCount - current - previous;
+  // Si hay déficit de una categoría, intentamos que aparezca en el bloque.
+  if (deficits.current > 0 && current === 0 && batchCount > 0) {
+    current = 1;
+  }
 
-  if (older > remainingOlder) {
-    let overflow = older - remainingOlder;
-    older = remainingOlder;
+  if (
+    deficits.previous > 0 &&
+    previous === 0 &&
+    current < batchCount
+  ) {
+    previous = 1;
+  }
 
-    const addCurrent = Math.min(overflow, remainingCurrent - current);
+  older = Math.max(0, batchCount - current - previous);
+
+  if (older > deficits.older) {
+    let overflow = older - deficits.older;
+    older = deficits.older;
+
+    const addCurrent = Math.min(
+      overflow,
+      Math.max(0, deficits.current - current)
+    );
     current += addCurrent;
     overflow -= addCurrent;
 
-    const addPrevious = Math.min(overflow, remainingPrevious - previous);
+    const addPrevious = Math.min(
+      overflow,
+      Math.max(0, deficits.previous - previous)
+    );
     previous += addPrevious;
     overflow -= addPrevious;
 
@@ -186,9 +252,10 @@ function allocateBatchTargets({ totalSongs, batchCount, allSongs, plan }) {
   }
 
   while (current + previous + older < batchCount) {
-    if (current < remainingCurrent) current += 1;
-    else if (previous < remainingPrevious) previous += 1;
-    else older += 1;
+    if (current < deficits.current) current += 1;
+    else if (previous < deficits.previous) previous += 1;
+    else if (older < deficits.older) older += 1;
+    else break;
   }
 
   while (current + previous + older > batchCount) {
@@ -198,6 +265,38 @@ function allocateBatchTargets({ totalSongs, batchCount, allSongs, plan }) {
   }
 
   return { current, previous, older };
+}
+
+function acceptSongsWithinPlan(existingSongs, incomingSongs, plan, maxTotal) {
+  const existingKeys = new Set(existingSongs.map(songKey));
+  const accepted = [];
+
+  const counts = countFreshness(existingSongs, plan);
+  const remaining = {
+    current: Math.max(0, plan.targetCurrent - counts.current),
+    previous: Math.max(0, plan.targetPrevious - counts.previous),
+    older: Math.max(0, plan.targetOlder - counts.older)
+  };
+
+  for (const rawSong of incomingSongs || []) {
+    if (existingSongs.length + accepted.length >= maxTotal) break;
+
+    const song = cleanSong(rawSong);
+    if (!song || !song.year) continue;
+
+    const key = songKey(song);
+    if (existingKeys.has(key)) continue;
+
+    const bucket = classifySongYear(song, plan);
+    if (bucket === 'unknown') continue;
+    if (remaining[bucket] <= 0) continue;
+
+    existingKeys.add(key);
+    remaining[bucket] -= 1;
+    accepted.push(song);
+  }
+
+  return accepted;
 }
 
 function buildPrompt({
@@ -212,13 +311,19 @@ function buildPrompt({
 }) {
   const recentSongs = (historial?.songs || []).slice(0, 150);
   const recentArtists = (historial?.artists || []).slice(0, 100);
-  const selectedSongs = alreadySelected.slice(-100).map(s => `${s.title} - ${s.artist}`);
-  const selectedArtists = [...new Set(alreadySelected.slice(-100).map(s => s.artist))];
+
+  const selectedSongs = alreadySelected
+    .slice(-100)
+    .map(s => `${s.title} - ${s.artist}`);
+
+  const selectedArtists = [
+    ...new Set(alreadySelected.slice(-100).map(s => s.artist))
+  ];
 
   return `
 Eres un curador musical experto en identidad sonora para negocios.
-Tu trabajo NO es hacer una playlist generica de streaming.
-Tu trabajo es hacer una seleccion editorial, distintiva, elegante, actual y poco obvia.
+Tu trabajo NO es hacer una playlist genérica de streaming.
+Tu trabajo es hacer una selección editorial, distintiva, elegante, actual y poco obvia.
 
 NEGOCIO:
 - Nombre: ${perfil.nombre || ''}
@@ -226,49 +331,66 @@ NEGOCIO:
 - Subtipo: ${perfil.subtipo || ''}
 - Ciudad: ${perfil.ciudad || ''}
 - Edad cliente: ${perfil.edad || ''}
-- Genero predominante cliente: ${perfil.gcliente || ''}
-- Descripcion del cliente: ${perfil.cdesc || ''}
+- Género predominante cliente: ${perfil.gcliente || ''}
+- Descripción del cliente: ${perfil.cdesc || ''}
 - Cliente ideal: ${perfil.cideal || ''}
 - Vibe: ${perfil.vibe || ''}
 - Referencias: ${perfil.refs || ''}
 - Permanencia: ${perfil.permanencia || ''}
 - Ruido: ${perfil.ruido || ''}
-- Dinamica: ${perfil.dinamica || ''}
-- Estetica: ${perfil.estetica || ''}
+- Dinámica: ${perfil.dinamica || ''}
+- Estética: ${perfil.estetica || ''}
 - No quiere: ${perfil.nowant || ''}
-- Horario operacion: ${perfil.horarioop || ''}
+- Horario operación: ${perfil.horarioop || ''}
 
 CONTEXTO DEL MOMENTO:
 - Horario actual de uso: ${contexto.horario || ''}
 - Objetivo musical: ${contexto.mood || ''}
-- Duracion solicitada: ${contexto.dur || ''} horas
+- Duración solicitada: ${contexto.dur || ''} horas
 - ${climaTexto}
 
 GENERA EXACTAMENTE ${count} CANCIONES NUEVAS PARA ESTE BLOQUE.
 
-ACTUALIDAD OBLIGATORIA PARA ESTE BLOQUE:
-- Exactamente ${batchTargets.current} canciones cuyo lanzamiento original sea de ${freshnessPlan.currentYear}.
-- Exactamente ${batchTargets.previous} canciones cuyo lanzamiento original sea de ${freshnessPlan.previousYear}.
-- Exactamente ${batchTargets.older} canciones cuyo lanzamiento original sea de ${freshnessPlan.previousYear - 1} o anterior.
-- No cuentes remasters, deluxe editions o reediciones recientes de canciones antiguas como lanzamientos nuevos.
-- Las canciones de ${freshnessPlan.currentYear} y ${freshnessPlan.previousYear} deben seguir siendo curadas, poco obvias y coherentes con el negocio. No elijas hits virales solo por ser recientes.
-- Si una cancion reciente no encaja musicalmente, busca otra reciente que si encaje; NO elimines la cuota de actualidad.
-- El campo year debe ser el ano real de lanzamiento original de la cancion.
+CUOTAS OBLIGATORIAS DE ACTUALIDAD PARA ESTE BLOQUE:
+- ${batchTargets.current} canciones cuyo PRIMER lanzamiento comercial de ESTA GRABACIÓN O VERSIÓN haya sido en ${freshnessPlan.currentYear}.
+- ${batchTargets.previous} canciones cuyo PRIMER lanzamiento comercial de ESTA GRABACIÓN O VERSIÓN haya sido en ${freshnessPlan.previousYear}.
+- ${batchTargets.older} canciones cuyo primer lanzamiento comercial haya sido en ${freshnessPlan.previousYear - 1} o antes.
+
+DEFINICIÓN ESTRICTA DEL CAMPO "year":
+- "year" significa el año del PRIMER lanzamiento comercial real de esa grabación o versión específica.
+- NO uses el año de una recopilación posterior.
+- NO uses el año de una reedición.
+- NO uses el año de una deluxe edition si la canción ya existía antes.
+- NO uses el año de un remaster.
+- NO uses el año de una banda sonora, compilación o reempaque posterior si esa misma grabación ya había sido publicada.
+- Si una canción de 2021 reaparece en un álbum o compilación de ${freshnessPlan.currentYear}, su year sigue siendo 2021.
+- Un remix o edit sí puede contar como reciente SOLO si ESA versión concreta fue lanzada por primera vez en ${freshnessPlan.currentYear} o ${freshnessPlan.previousYear}.
+- Si no estás razonablemente seguro del año original de lanzamiento, NO uses esa canción.
+- Nunca inventes un año para cumplir la cuota.
+
+REGLAS PARA LA MÚSICA RECIENTE:
+- Las canciones de ${freshnessPlan.currentYear} y ${freshnessPlan.previousYear} deben sentirse realmente actuales.
+- No elijas hits virales solo por ser nuevos.
+- Busca lanzamientos recientes con criterio editorial y coherentes con el negocio.
+- Si una canción reciente no encaja, reemplázala por otra reciente que sí encaje. NO elimines la cuota de actualidad.
 
 REGLAS EDITORIALES OBLIGATORIAS:
-1. Evita musica demasiado comercial, demasiado obvia, demasiado viral o demasiado gastada.
-2. No hagas una playlist de grandes exitos.
-3. No suenes a playlist generica de cafeteria, hotel, tienda o restaurante.
+1. Evita música demasiado comercial, demasiado obvia, demasiado viral o demasiado gastada.
+2. No hagas una playlist de grandes éxitos.
+3. No suenes a playlist genérica de cafetería, hotel, tienda o restaurante.
 4. Prioriza criterio editorial, descubrimiento, profundidad y coherencia con el negocio.
-5. Mezcla familiaridad y descubrimiento. Como guia aproximada: 70% distintiva/poco obvia, 20% familiar no quemada y maximo 10% muy reconocible.
-6. La playlist debe sentirse viva en ${freshnessPlan.currentYear}: combina lanzamientos actuales con catalogo anterior de calidad. No hagas nostalgia pura ni una playlist compuesta solo por novedades.
-7. Puedes usar jazz, soul, pop, hip-hop, R&B, funk, disco, house, electronica, ambient, indie, bossa, Afro, Latin, downtempo, trip-hop, neo-soul, world y otros generos, PERO solo si encajan con el negocio y el momento. No fuerces variedad artificial.
-8. No repitas canciones.
-9. Evita repetir artistas siempre que sea posible. En playlists largas, un artista puede aparecer maximo 2 veces y nunca de forma cercana.
-10. No inventes canciones ni artistas. Usa solo canciones reales y plausibles de encontrar en Spotify.
-11. Respeta estrictamente lo que el negocio indico que NO quiere.
-12. Si dudas entre una cancion famosa y una mejor curada, elige la mejor curada.
-13. Evita versiones karaoke, tribute, covers genericos, live versions o remixes salvo que sean editorialmente necesarios.
+5. Como guía aproximada: 70% distintiva/poco obvia, 20% familiar no quemada y máximo 10% muy reconocible.
+6. La playlist debe sentirse viva en ${freshnessPlan.currentYear}: combina lanzamientos actuales con catálogo anterior de calidad.
+7. No hagas nostalgia pura ni una lista compuesta solo por novedades.
+8. Puedes usar jazz, soul, pop, hip-hop, R&B, funk, disco, house, electrónica, ambient, indie, bossa, Afro, Latin, downtempo, trip-hop, neo-soul, world y otros géneros, pero solo si encajan con el negocio y el momento.
+9. No fuerces variedad artificial.
+10. No repitas canciones.
+11. Evita repetir artistas siempre que sea posible. En playlists largas, un artista puede aparecer máximo 2 veces y nunca de forma cercana.
+12. No inventes canciones ni artistas.
+13. Usa solo canciones reales y plausibles de encontrar en Spotify.
+14. Respeta estrictamente lo que el negocio indicó que NO quiere.
+15. Si dudas entre una canción famosa y una mejor curada, elige la mejor curada.
+16. Evita karaoke, tribute, covers genéricos, live versions o regrabaciones salvo que sean editorialmente necesarias.
 
 EVITA ESTAS CANCIONES DEL HISTORIAL:
 ${recentSongs.length ? recentSongs.map(s => `- ${s}`).join('\n') : '- Ninguna'}
@@ -282,14 +404,22 @@ ${selectedSongs.length ? selectedSongs.map(s => `- ${s}`).join('\n') : '- Ningun
 ARTISTAS YA USADOS EN ESTA PLAYLIST. EVITA REPETIRLOS SALVO QUE SEA NECESARIO:
 ${selectedArtists.length ? selectedArtists.map(a => `- ${a}`).join('\n') : '- Ninguno'}
 
-Responde UNICAMENTE con JSON valido. No uses markdown ni texto antes o despues.
+RESPUESTA:
+Devuelve ÚNICAMENTE JSON válido.
+No uses markdown.
+No escribas texto antes ni después.
 
 Estructura exacta:
 {
-  "playlistName": "nombre poetico y corto",
-  "description": "descripcion editorial breve",
+  "playlistName": "nombre poético y corto",
+  "description": "descripción editorial breve",
   "songs": [
-    { "title": "titulo real", "artist": "artista real", "genre": "genero especifico", "year": 2026 }
+    {
+      "title": "título real",
+      "artist": "artista real",
+      "genre": "género específico",
+      "year": ${freshnessPlan.currentYear}
+    }
   ]
 }
 `.trim();
@@ -308,7 +438,9 @@ export default async function handler(req, res) {
     const { perfil, contexto, historial } = req.body || {};
 
     if (!perfil || !contexto) {
-      return res.status(400).json({ error: 'Faltan datos de perfil o contexto' });
+      return res.status(400).json({
+        error: 'Faltan datos de perfil o contexto'
+      });
     }
 
     const lat = Number(contexto.lat);
@@ -332,45 +464,85 @@ export default async function handler(req, res) {
           let estado = 'templado';
 
           if (!Number.isNaN(temp)) {
-            if (temp <= 10) estado = 'frio';
-            else if (temp >= 30) estado = 'caluroso';
-            else if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(code)) estado = 'lluvioso';
-            else if ([1, 2, 3, 45, 48].includes(code)) estado = 'nublado';
-            else estado = 'soleado';
+            if (temp <= 10) {
+              estado = 'frío';
+            } else if (temp >= 30) {
+              estado = 'caluroso';
+            } else if (
+              [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(code)
+            ) {
+              estado = 'lluvioso';
+            } else if ([1, 2, 3, 45, 48].includes(code)) {
+              estado = 'nublado';
+            } else {
+              estado = 'soleado';
+            }
           }
 
-          climaTexto = `Clima actual: ${estado}, ${Number.isNaN(temp) ? 'temperatura no disponible' : `${temp} C`}, weather code ${code}`;
+          climaTexto =
+            `Clima actual: ${estado}, ` +
+            `${Number.isNaN(temp) ? 'temperatura no disponible' : `${temp} C`}, ` +
+            `weather code ${code}`;
         }
       } catch (weatherError) {
         console.warn('Weather error:', weatherError);
       }
     }
 
-    const requested = Number(contexto.songCount) || Number(contexto.dur || 4) * 15;
-    const totalSongs = clamp(Math.round(requested), 1, MAX_SONGS);
+    const requested =
+      Number(contexto.songCount) ||
+      Number(contexto.dur || 4) * 15;
+
+    const totalSongs = clamp(
+      Math.round(requested),
+      1,
+      MAX_SONGS
+    );
+
     const freshnessPlan = buildFreshnessPlan(totalSongs);
 
     let allSongs = [];
     let playlistName = '';
     let description = '';
-    let attempts = 0;
-    const maxAttempts = Math.ceil(totalSongs / BATCH_SIZE) + 6;
 
-    while (allSongs.length < totalSongs && attempts < maxAttempts) {
+    let attempts = 0;
+    const baseBatches = Math.ceil(totalSongs / BATCH_SIZE);
+    const maxAttempts = baseBatches + 6;
+
+    while (
+      allSongs.length < totalSongs &&
+      attempts < maxAttempts
+    ) {
       attempts += 1;
 
-      const remaining = totalSongs - allSongs.length;
-      const targetCount = Math.min(BATCH_SIZE, remaining);
-      const batchTargets = allocateBatchTargets({
-        totalSongs,
-        batchCount: targetCount,
+      const deficits = getFreshnessDeficits(
         allSongs,
-        plan: freshnessPlan
-      });
+        freshnessPlan
+      );
+
+      const remaining =
+        deficits.current +
+        deficits.previous +
+        deficits.older;
+
+      if (remaining <= 0) break;
+
+      const targetCount = Math.min(
+        BATCH_SIZE,
+        remaining
+      );
+
+      const batchTargets = allocateBatchTargets(
+        deficits,
+        targetCount
+      );
 
       const prompt = buildPrompt({
         perfil,
-        contexto: { ...contexto, songCount: totalSongs },
+        contexto: {
+          ...contexto,
+          songCount: totalSongs
+        },
         climaTexto,
         historial,
         alreadySelected: allSongs,
@@ -382,34 +554,93 @@ export default async function handler(req, res) {
       const parsed = await callAnthropic(prompt);
 
       if (!playlistName && parsed?.playlistName) {
-        playlistName = String(parsed.playlistName).trim();
+        playlistName = String(
+          parsed.playlistName
+        ).trim();
       }
 
       if (!description && parsed?.description) {
-        description = String(parsed.description).trim();
+        description = String(
+          parsed.description
+        ).trim();
       }
 
-      const incoming = uniqueSongs(parsed?.songs || []);
-      const before = allSongs.length;
-      allSongs = uniqueSongs([...allSongs, ...incoming]).slice(0, totalSongs);
+      const incoming = uniqueSongs(
+        parsed?.songs || []
+      );
 
-      if (allSongs.length === before) {
-        console.warn('No new unique songs returned on attempt', attempts);
+      const accepted = acceptSongsWithinPlan(
+        allSongs,
+        incoming,
+        freshnessPlan,
+        totalSongs
+      );
+
+      if (!accepted.length) {
+        console.warn(
+          'No valid songs accepted on attempt',
+          attempts,
+          {
+            requestedBatch: batchTargets,
+            returned: incoming.length
+          }
+        );
       }
+
+      allSongs = [
+        ...allSongs,
+        ...accepted
+      ].slice(0, totalSongs);
     }
 
-    if (!allSongs.length) {
-      return res.status(500).json({ error: 'No se pudieron generar canciones validas' });
-    }
+    const finalFreshness = countFreshness(
+      allSongs,
+      freshnessPlan
+    );
 
-    const finalFreshness = countFreshness(allSongs, freshnessPlan);
+    const complete =
+      allSongs.length === totalSongs &&
+      finalFreshness.current === freshnessPlan.targetCurrent &&
+      finalFreshness.previous === freshnessPlan.targetPrevious &&
+      finalFreshness.older === freshnessPlan.targetOlder &&
+      finalFreshness.unknown === 0;
+
+    if (!complete) {
+      console.error('Freshness plan incomplete', {
+        totalSongs,
+        generated: allSongs.length,
+        target: freshnessPlan,
+        actual: finalFreshness
+      });
+
+      return res.status(500).json({
+        error:
+          'No se pudo completar la mezcla de actualidad requerida. Intenta generar de nuevo.',
+        requestedSongCount: totalSongs,
+        generatedSongCount: allSongs.length,
+        freshness: {
+          currentYear: freshnessPlan.currentYear,
+          previousYear: freshnessPlan.previousYear,
+          targetCurrent: freshnessPlan.targetCurrent,
+          targetPrevious: freshnessPlan.targetPrevious,
+          targetOlder: freshnessPlan.targetOlder,
+          actualCurrent: finalFreshness.current,
+          actualPrevious: finalFreshness.previous,
+          actualOlder: finalFreshness.older,
+          unknownYear: finalFreshness.unknown
+        }
+      });
+    }
 
     return res.status(200).json({
-      playlistName: playlistName || 'Particula del dia',
-      description: description || 'Seleccion curada para el momento y el perfil del negocio.',
-      songs: allSongs.slice(0, totalSongs),
+      playlistName:
+        playlistName || 'Partícula del día',
+      description:
+        description ||
+        'Selección curada para el momento y el perfil del negocio.',
+      songs: allSongs,
       requestedSongCount: totalSongs,
-      partial: allSongs.length < totalSongs,
+      partial: false,
       freshness: {
         currentYear: freshnessPlan.currentYear,
         previousYear: freshnessPlan.previousYear,
@@ -425,6 +656,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error(error);
+
     return res.status(500).json({
       error: 'Error generando playlist',
       detail: error?.message || String(error)
